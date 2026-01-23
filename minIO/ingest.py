@@ -8,20 +8,16 @@ from datetime import datetime
 from collections import defaultdict
 
 # --- CONFIGURATION ---
-KAFKA_SERVER = '172.30.2.37:9092' # Thay IP VPS Kafka của bạn
+KAFKA_SERVER = '172.30.2.37:9092' 
 MINIO_ENDPOINT = 'localhost:9000'
 MINIO_ACCESS_KEY = 'admin'
-MINIO_SECRET_KEY = '12345678' # Pass bạn vừa đổi
+MINIO_SECRET_KEY = '12345678'
 MINIO_BUCKET = 'hospital-datalake'
 
-# Regex để lấy tất cả topic. 
-# '^.*$' nghĩa là lấy hết. 
-# Nếu muốn chỉ lấy topic bắt đầu bằng 'hospital', dùng: '^hospital.*$'
-# TOPIC_PATTERN = '^.*$' 
 TOPIC_PATTERN = '^his\.core_his_prod\..*$' 
 
-# Số lượng message mỗi topic cần gom đủ trước khi upload
 BATCH_SIZE = 50 
+FLUSH_INTERVAL_SECONDS = 30 # (Mới) Thời gian chờ tối đa
 
 def connect_minio():
     return Minio(
@@ -31,25 +27,50 @@ def connect_minio():
         secure=False
     )
 
+# (Mới) Hàm upload dùng chung để tránh viết lặp lại code
+def upload_batch(minio_client, topic, data_buffer, reason="BATCH"):
+    if not data_buffer:
+        return
+
+    now = datetime.now()
+    path_prefix = f"{topic}/{now.year}/{now.month:02d}/{now.day:02d}"
+    timestamp_str = now.strftime("%H%M%S%f")
+    # Thêm reason vào tên file để dễ debug (VD: data_batch_... hoặc data_time_...)
+    filename = f"{path_prefix}/data_{reason.lower()}_{timestamp_str}.json"
+    
+    try:
+        data_bytes = json.dumps(data_buffer).encode('utf-8')
+        minio_client.put_object(
+            MINIO_BUCKET,
+            filename,
+            io.BytesIO(data_bytes),
+            length=len(data_bytes),
+            content_type='application/json'
+        )
+        print(f"[{reason}-UPLOAD] {topic}: {len(data_buffer)} rows -> {filename}")
+    except Exception as ex:
+        print(f"[ERROR] Failed to upload {topic}: {ex}")
+
 def main():
-    print(f"Starting Multi-Topic ETL Worker...")
+    print(f"Starting Multi-Topic ETL Worker (Time & Size based)...")
     
     # 1. Setup MinIO
     minio_client = connect_minio()
     if not minio_client.bucket_exists(MINIO_BUCKET):
         minio_client.make_bucket(MINIO_BUCKET)
     
-    # 2. Setup Kafka Consumer with Pattern Subscription
+    # 2. Setup Kafka Consumer
     while True:
         try:
             consumer = KafkaConsumer(
                 bootstrap_servers=[KAFKA_SERVER],
                 auto_offset_reset='earliest',
                 enable_auto_commit=True,
-                group_id='minio-multi-topic-group-v1',
-                value_deserializer=lambda x: json.loads(x.decode('utf-8'))
+                group_id='minio-multi-topic-group-v2', # Đổi version group để tránh offset cũ
+                value_deserializer=lambda x: json.loads(x.decode('utf-8')),
+                # (QUAN TRỌNG) Nếu 1s không có tin mới, vòng lặp consumer sẽ nhả ra để check thời gian
+                consumer_timeout_ms=1000 
             )
-            # Subscribe using Regex Pattern
             consumer.subscribe(pattern=TOPIC_PATTERN)
             print(f"Connected to Kafka. Listening to pattern: '{TOPIC_PATTERN}'")
             break
@@ -57,75 +78,44 @@ def main():
             print(f"Waiting for Kafka... Error: {e}")
             time.sleep(5)
 
-    # 3. Buffer Dictionary: { 'topic_A': [msg1, msg2], 'topic_B': [msg1] }
     topic_buffers = defaultdict(list)
+    last_flush_time = time.time() # Mốc thời gian lần cuối check
     
     print("Worker is running...")
     
     try:
-        for message in consumer:
-            topic = message.topic
+        while True:
+            # Vòng lặp này sẽ chạy tối đa 1s nếu ko có tin (do config consumer_timeout_ms)
+            # Sau đó nó thoát ra để xuống đoạn check thời gian bên dưới, rồi lại quay lại
+            for message in consumer:
+                topic = message.topic
+                if topic.startswith("__"): continue
+                
+                topic_buffers[topic].append(message.value)
+                
+                # CHECK 1: Đủ số lượng (BATCH_SIZE)
+                if len(topic_buffers[topic]) >= BATCH_SIZE:
+                    upload_batch(minio_client, topic, topic_buffers[topic], reason="SIZE")
+                    topic_buffers[topic] = [] # Clear buffer
             
-            # Skip internal Kafka topics (like __consumer_offsets)
-            if topic.startswith("__"):
-                continue
+            # CHECK 2: Đủ thời gian (FLUSH_INTERVAL)
+            current_time = time.time()
+            if current_time - last_flush_time > FLUSH_INTERVAL_SECONDS:
+                # Duyệt qua các topic đang có dữ liệu tồn đọng
+                for topic, buffer in topic_buffers.items():
+                    if len(buffer) > 0:
+                        upload_batch(minio_client, topic, buffer, reason="TIME")
+                        topic_buffers[topic] = [] # Clear buffer
                 
-            # Add message to the specific buffer for this topic
-            topic_buffers[topic].append(message.value)
-            
-            # Check if THIS specific topic has enough data to upload
-            if len(topic_buffers[topic]) >= BATCH_SIZE:
-                current_buffer = topic_buffers[topic]
-                
-                # --- Upload Logic ---
-                # Structure: topic_name/YYYY/MM/DD/timestamp.json
-                now = datetime.now()
-                path_prefix = f"{topic}/{now.year}/{now.month:02d}/{now.day:02d}"
-                timestamp_str = now.strftime("%H%M%S%f")
-                filename = f"{path_prefix}/data_{timestamp_str}.json"
-                
-                try:
-                    data_bytes = json.dumps(current_buffer).encode('utf-8')
-                    minio_client.put_object(
-                        MINIO_BUCKET,
-                        filename,
-                        io.BytesIO(data_bytes),
-                        length=len(data_bytes),
-                        content_type='application/json'
-                    )
-                    
-                    print(f"[UPLOAD] {topic}: {len(current_buffer)} rows -> {filename}")
-                    
-                    # Clear only this topic's buffer
-                    topic_buffers[topic] = []
-                    
-                except Exception as ex:
-                    print(f"[ERROR] Failed to upload {topic}: {ex}")
+                # Reset đồng hồ
+                last_flush_time = current_time
 
     except KeyboardInterrupt:
-        print("Stopping worker...")
-        # Optional: Flush remaining data in buffers before exit
-        # Duyệt qua tất cả các topic đang có dữ liệu chờ
+        print("\nStopping worker... Flushing remaining data...")
+        # CHECK 3: Khi tắt chương trình
         for topic, buffer in topic_buffers.items():
             if len(buffer) > 0:
-                # Logic upload tương tự như trên
-                now = datetime.now()
-                path_prefix = f"{topic}/{now.year}/{now.month:02d}/{now.day:02d}"
-                timestamp_str = now.strftime("%H%M%S%f")
-                filename = f"{path_prefix}/data_flush_{timestamp_str}.json" # Thêm chữ flush để dễ nhận biết
-                
-                try:
-                    data_bytes = json.dumps(buffer).encode('utf-8')
-                    minio_client.put_object(
-                        MINIO_BUCKET,
-                        filename,
-                        io.BytesIO(data_bytes),
-                        length=len(data_bytes),
-                        content_type='application/json'
-                    )
-                    print(f"[FLUSH] {topic}: Saved remaining {len(buffer)} rows.")
-                except Exception as ex:
-                    print(f"[ERROR] Failed to flush {topic}: {ex}")
+                upload_batch(minio_client, topic, buffer, reason="SHUTDOWN")
         
         print("Worker stopped safely.")
 
