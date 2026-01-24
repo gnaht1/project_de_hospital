@@ -429,6 +429,158 @@ schema_dm_hop_dong_ksk = StructType([
     StructField("updated_at", TimestampType(), True)
 ])
 
+# Table 21: DM_NGUOI_GIOI_THIEU
+schema_dm_nguoi_gioi_thieu = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("code_nguoi_gioi_thieu", StringType(), True),
+    StructField("ten", StringType(), True),
+    StructField("ds_nguon_nb_id", StringType(), True),
+    StructField("active", BooleanType(), True),
+    StructField("deleted", IntegerType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
+# Table 22: DM_NGUON_NB
+schema_dm_nguon_nb = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("code_nguon_nb", StringType(), True),
+    StructField("ten", StringType(), True),
+    StructField("nguoi_gioi_thieu", BooleanType(), True),
+    StructField("nhom_nguon", IntegerType(), True),
+    StructField("active", BooleanType(), True),
+    StructField("deleted", IntegerType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
+# Table 23: DM_NHAN_VIEN
+schema_dm_nhan_vien = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("code_nhan_vien", StringType(), True),
+    StructField("ten", StringType(), True),
+    StructField("chung_chi", StringType(), True),
+    StructField("ds_chuyen_khoa_id", StringType(), True),
+    StructField("email", StringType(), True),
+    StructField("gioi_tinh", StringType(), True),
+    StructField("hoc_ham_hoc_vi_id", IntegerType(), True),
+    StructField("ngay_sinh", StringType(), True),
+    StructField("van_bang_id", IntegerType(), True),
+    StructField("active", BooleanType(), True),
+    StructField("deleted", IntegerType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
+# Table 24: DM_NHOM_DICH_VU_CAP1
+schema_dm_nhom_dich_vu_cap1 = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("code_service_lvl_1", StringType(), True),
+    StructField("ten", StringType(), True),
+    StructField("loai_dich_vu", FloatType(), True),
+    StructField("stt_bang_ke", IntegerType(), True),
+    StructField("trang_thai_hoan_thanh", FloatType(), True),
+    StructField("trang_thai_lay_stt", FloatType(), True),
+    StructField("active", BooleanType(), True),
+    StructField("deleted", IntegerType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
+# Table 25: DM_NHOM_DICH_VU_CAP2
+schema_dm_nhom_dich_vu_cap2 = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("code_service_lvl_2", StringType(), True),
+    StructField("ten", StringType(), True),
+    StructField("luu_phim_chup", BooleanType(), True),
+    StructField("nhom_dich_vu_cap1_id", IntegerType(), True),
+    StructField("phieu_chi_dinh_id", FloatType(), True),
+    StructField("tach_stt_noi_tru", BooleanType(), True),
+    StructField("tach_stt_uu_tien", BooleanType(), True),
+    StructField("theo_yeu_cau", BooleanType(), True),
+    StructField("tiep_don_cls", BooleanType(), True),
+    StructField("trang_thai_hoan_thanh", FloatType(), True),
+    StructField("trang_thai_lay_stt", FloatType(), True),
+    StructField("active", BooleanType(), True),
+    StructField("deleted", IntegerType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
+# Table 26: DM_NHOM_DICH_VU_CAP3
+schema_dm_nhom_dich_vu_cap3 = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("code_service_lvl_3", StringType(), True),
+    StructField("ten", StringType(), True),
+    StructField("nhom_dich_vu_cap2_id", IntegerType(), True),
+    StructField("active", BooleanType(), True),
+    StructField("deleted", IntegerType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
+# Table 27: DM_PHONG
+schema_dm_phong = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("code_phong", StringType(), True),
+    StructField("ten", StringType(), True),
+    StructField("chuyen_khoa_id", FloatType(), True),
+    StructField("dia_diem", StringType(), True),
+    StructField("ds_loai_phong", StringType(), True),
+    StructField("khoa_id", IntegerType(), True),
+    StructField("ngoai_tru", BooleanType(), True),
+    StructField("ngoai_vien", BooleanType(), True),
+    StructField("noi_tru", BooleanType(), True),
+    StructField("online", BooleanType(), True),
+    StructField("active", BooleanType(), True),
+    StructField("deleted", IntegerType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
+# Table 28: DM_QUAN_HUYEN
+schema_dm_quan_huyen = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("ten", StringType(), True),
+    StructField("code_quan_huyen", IntegerType(), True),
+    StructField("ma_tcqg", IntegerType(), True),
+    StructField("tinh_thanh_pho_id", IntegerType(), True),
+    StructField("active", BooleanType(), True),
+    StructField("deleted", IntegerType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
+# Table 39: DM_TINH_THANH_PHO
+schema_dm_tinh_thanh_pho = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("code_province", IntegerType(), True),
+    StructField("ten", StringType(), True),
+    StructField("ma_tcqg", IntegerType(), True),
+    StructField("active", BooleanType(), True),
+    StructField("deleted", IntegerType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
+# Table 30: DM_XA_PHUONG
+schema_dm_xa_phuong = StructType([
+    StructField("xa_phuong_id", IntegerType(), True),
+    StructField("ten_xa_phuong", StringType(), True),
+    StructField("quan_huyen_id", IntegerType(), True),
+])
+
+# Table 31: HOSPITAL_CONFIGS
+schema_hospital_configs = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("table_name", StringType(), True),
+    StructField("column_name", StringType(), True),
+    StructField("value_code", StringType(), True),
+    StructField("description", StringType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
 
 # --- CONFIG TABLES (IMPORTANT) ---
 # Key: Kafka Topic Name
@@ -482,10 +634,6 @@ TABLE_CONFIGS = {
         "table_name": "ct_phieu_thu_iceberg",
         "schema": schema_ct_phieu_thu
     },
-    "his.core_his_prod.ct_phieu_thu": {
-        "table_name": "ct_phieu_thu_iceberg",
-        "schema": schema_ct_phieu_thu
-    },
     "his.core_his_prod.dm_benh_nhan": {
         "table_name": "dm_benh_nhan_iceberg",
         "schema": schema_dm_benh_nhan
@@ -518,5 +666,48 @@ TABLE_CONFIGS = {
         "table_name": "dm_hop_dong_ksk_iceberg",
         "schema": schema_dm_hop_dong_ksk
     },
-
+    "his.core_his_prod.dm_nguoi_gioi_thieu": {
+        "table_name": "dm_nguoi_gioi_thieu_iceberg",
+        "schema": schema_dm_nguoi_gioi_thieu
+    },
+    "his.core_his_prod.dm_nguon_nb": {
+        "table_name": "dm_nguon_nb_iceberg",
+        "schema": schema_dm_nguon_nb
+    },
+    "his.core_his_prod.dm_nhan_vien": {
+        "table_name": "dm_nhan_vien_iceberg",
+        "schema": schema_dm_nhan_vien
+    },
+    "his.core_his_prod.dm_nhom_dich_vu_cap1": {
+        "table_name": "dm_nhom_dich_vu_cap1_iceberg",
+        "schema": schema_dm_nhom_dich_vu_cap1
+    },
+    "his.core_his_prod.dm_nhom_dich_vu_cap2": {
+        "table_name": "dm_nhom_dich_vu_cap2_iceberg",
+        "schema": schema_dm_nhom_dich_vu_cap2
+    },
+    "his.core_his_prod.dm_nhom_dich_vu_cap3": {
+        "table_name": "dm_nhom_dich_vu_cap3_iceberg",
+        "schema": schema_dm_nhom_dich_vu_cap3
+    },
+    "his.core_his_prod.dm_phong": {
+        "table_name": "dm_phong_iceberg",
+        "schema": schema_dm_phong
+    },
+    "his.core_his_prod.dm_quan_huyen": {
+        "table_name": "dm_quan_huyen_iceberg",
+        "schema": schema_dm_quan_huyen
+    },
+    "his.core_his_prod.dm_tinh_thanh_pho": {
+        "table_name": "dm_tinh_thanh_pho_iceberg",
+        "schema": schema_dm_tinh_thanh_pho
+    },
+    "his.core_his_prod.dm_xa_phuong": {
+        "table_name": "dm_xa_phuong_iceberg",
+        "schema": schema_dm_xa_phuong
+    },
+    "his.core_his_prod.hospital_configs": {
+        "table_name": "hospital_configs_iceberg",
+        "schema": schema_hospital_configs
+    }
 }
