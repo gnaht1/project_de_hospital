@@ -1,0 +1,349 @@
+from pyspark.sql.types import VarcharType
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, BooleanType, DoubleType, FloatType
+
+# Function to automatically wrap Schema into Debezium envelope
+def get_debezium_envelope(table_schema):
+    return StructType([
+        StructField("before", StringType(), True),
+        StructField("after", table_schema, True), # Data really here
+        StructField("op", StringType(), True),
+        StructField("ts_ms", StringType(), True) # Change to LongType if needed
+    ])
+
+# ====================================================
+# DEFINE TABLES (Add 31 tables here)
+# ====================================================
+
+# Table 1: DM_KHOA
+schema_dm_khoa = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("code_khoa", StringType(), True),
+    StructField("ten", StringType(), True),
+    StructField("active", BooleanType(), True),
+    StructField("deleted", IntegerType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
+# Table 2: DM_LOAI_DICH_VU
+schema_dm_loai_dich_vu = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("ten", StringType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
+# Table 3: CT_ADDRESS
+schema_ct_address = StructType([
+    StructField("nb_dot_dieu_tri_id", IntegerType(), True),
+    StructField("so_nha", StringType(), True),
+    StructField("so_nha_tam_tru", StringType(), True),
+    StructField("xa_phuong_id", FloatType(), True),
+    StructField("xa_phuong_tam_tru_id", StringType(), True),
+    StructField("quan_huyen_id", FloatType(), True),
+    StructField("quan_huyen_tam_tru_id", StringType(), True),
+    StructField("tinh_thanh_pho_id", FloatType(), True),
+    StructField("tinh_thanh_pho_tam_tru_id", StringType(), True),
+    StructField("dia_chi_cong_ty", StringType(), True),
+    StructField("ten_cong_ty", StringType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True),
+])
+
+# Table 4: CT_BO_CHI_DINH
+schema_ct_bo_chi_dinh = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("nb_dot_dieu_tri_id", IntegerType(), True),
+    StructField("bo_chi_dinh_id", IntegerType(), True),
+    StructField("thoi_gian_chi_dinh", StringType(), True),
+    StructField("active", BooleanType(), True),
+    StructField("deleted", IntegerType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
+# Table 5: CT_DICH_VU
+schema_ct_dich_vu = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("nb_dot_dieu_tri_id", IntegerType(), True),
+    StructField("bo_chi_dinh_id", IntegerType(), True),
+    StructField("thoi_gian_chi_dinh", StringType(), True),
+    StructField("active", BooleanType(), True),
+    StructField("deleted", IntegerType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
+# Table 6: CT_DOT_DIEU_TRI
+schema_ct_dot_dieu_tri = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("cap_cuu", BooleanType(), True),
+    StructField("chi_nam_sinh", BooleanType(), True),
+    StructField("dan_toc_id", FloatType(), True),
+    StructField("doi_tuong", IntegerType(), True),
+    StructField("doi_tuong_kcb", IntegerType(), True),
+    StructField("gioi_tinh", IntegerType(), True),
+    StructField("kham_suc_khoe", BooleanType(), True),
+    StructField("khoa_id", IntegerType(), True),
+    StructField("khoa_tiep_don_id", IntegerType(), True),
+    StructField("loai_benh_an_id", StringType(), True),
+    StructField("loai_doi_tuong_id", FloatType(), True),
+    StructField("ma_benh_an", StringType(), True),
+    StructField("ma_ho_so", IntegerType(), True),
+    StructField("ma_nb", IntegerType(), True),
+    StructField("mac_dinh", BooleanType(), True),
+    StructField("nb_thong_tin_id", IntegerType(), True),
+    StructField("ngay_sinh", StringType(), True),
+    StructField("nghe_nghiep_id", StringType(), True),
+    StructField("ngoai_vien", BooleanType(), True),
+    StructField("nguoi_lap_benh_an_id", StringType(), True),
+    StructField("nhom_mau", StringType(), True),
+    StructField("noi_lam_viec", StringType(), True),
+    StructField("phan_loai_nb_id", StringType(), True),
+    StructField("quoc_tich_id", IntegerType(), True),
+    StructField("so_bao_hiem_xa_hoi", StringType(), True),
+    StructField("so_dien_thoai", StringType(), True),
+    StructField("so_ngay_dieu_tri", IntegerType(), True),
+    StructField("so_phoi", StringType(), True),
+    StructField("ten_nb", StringType(), True),
+    StructField("ten_nb_khong_dau", StringType(), True),
+    StructField("thoi_gian_lap_benh_an", StringType(), True),
+    StructField("thoi_gian_ra_vien", StringType(), True),
+    StructField("thoi_gian_vao_vien", StringType(), True),
+    StructField("tiem_chung", BooleanType(), True),
+    StructField("trang_thai", IntegerType(), True),
+    StructField("uu_tien", BooleanType(), True),
+    StructField("duyet_chi_phi", StringType(), True),
+    StructField("bang_lai_xe_id", StringType(), True),
+    StructField("ma_doi_tuong_kcb_id", StringType(), True),
+    StructField("nhan_vien_kinh_doanh_id", StringType(), True),
+    StructField("can_nang_vao_vien", StringType(), True),
+    StructField("cong_ty_bao_hiem_id", StringType(), True),
+    StructField("phan_loai_doi_tuong", FloatType(), True),
+    StructField("nguoi_duyet_chi_phi_id", StringType(), True),
+    StructField("nguoi_gui_duyet_chi_phi_id", StringType(), True),
+    StructField("nguoi_tu_choi_duyet_chi_phi_id", StringType(), True),
+    StructField("loai_lien_ket", StringType(), True),
+    StructField("nb_lien_ket_id", StringType(), True),
+    StructField("ho_ngheo", BooleanType(), True),
+    StructField("active", BooleanType(), True),
+    StructField("deleted", IntegerType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+]
+)
+
+# Table 7: CT_DV_KHAM
+schema_ct_dv_kham = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("nb_dot_dieu_tri_id", IntegerType(), True),
+    StructField("bac_si_ket_luan_id", FloatType(), True),
+    StructField("bac_si_kham_id", FloatType(), True),
+    StructField("dot_kham_moi", BooleanType(), True),
+    StructField("nguoi_phien_dich_id", StringType(), True),
+    StructField("stt_chuyen_khoa", StringType(), True),
+    StructField("thiet_lap", StringType(), True),
+    StructField("thoi_gian_kham", StringType(), True),
+    StructField("thoi_gian_ket_luan", StringType(), True),
+    StructField("active", BooleanType(), True),
+    StructField("deleted", IntegerType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
+# Table 8: CT_DV_KHAM_KET_LUAN
+schema_ct_dv_kham_ket_luan = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("nb_dot_dieu_tri_id", IntegerType(), True),
+    StructField("huong_dieu_tri", FloatType(), True),
+    StructField("ket_qua_dieu_tri", FloatType(), True),
+    StructField("loi_dan", StringType(), True),
+    StructField("phong_hen_kham_id", FloatType(), True),
+    StructField("so_ngay_cho_don", FloatType(), True),
+    StructField("thoi_gian_hen_tai_kham", StringType(), True),
+    StructField("thoi_gian_ket_luan", StringType(), True),
+    StructField("so_hen_kham", StringType(), True),
+    StructField("thong_tin_theo_doi", StringType(), True),
+    StructField("den_ngay", StringType(), True),
+    StructField("tu_ngay", StringType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
+# Table 9: CT_DV_KY_THUAT
+schema_ct_dv_ky_thuat = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("nb_dot_dieu_tri_id", IntegerType(), True),
+    StructField("cap_cuu", BooleanType(), True),
+    StructField("hinh_thuc_tt_ksk", FloatType(), True),
+    StructField("in_phieu_chi_dinh", IntegerType(), True),
+    StructField("ngoai_vien_id", StringType(), True),
+    StructField("phieu_in_id", FloatType(), True),
+    StructField("phong_thuc_hien_id", FloatType(), True),
+    StructField("so_lan_goi", FloatType(), True),
+    StructField("so_phieu_id", FloatType(), True),
+    StructField("stt", FloatType(), True),
+    StructField("tam_ung", BooleanType(), True),
+    StructField("thanh_toan_sau", BooleanType(), True),
+    StructField("theo_yeu_cau", BooleanType(), True),
+    StructField("thoi_gian_lay_so", StringType(), True),
+    StructField("thoi_gian_tiep_nhan", StringType(), True),
+    StructField("thuc_hien_tai_khoa", BooleanType(), True),
+    StructField("trang_thai", IntegerType(), True),
+    StructField("tu_van_vien_id", StringType(), True),
+    StructField("uu_tien", BooleanType(), True),
+    StructField("ly_do_khong_thuc_hien", StringType(), True),
+    StructField("thoi_gian_xac_nhan_khong_thuc_hien", StringType(), True),
+    StructField("khong_thuc_hien", BooleanType(), True),
+    StructField("ly_doi_khong_thuc_hien", StringType(), True),
+    StructField("trang_thai_thong_bao", StringType(), True),
+    StructField("thoi_gian_bat_dau", StringType(), True),
+    StructField("thoi_gian_hoan_thanh", StringType(), True),
+    StructField("active", BooleanType(), True),
+    StructField("deleted", IntegerType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
+# Table 10: CT_KHAM_SUC_KHOE
+schema_ct_kham_suc_khoe = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("chuc_vu", StringType(), True),
+    StructField("den_thoi_gian_kham", StringType(), True),
+    StructField("den_thoi_gian_lay_mau", StringType(), True),
+    StructField("dia_diem_kham", StringType(), True),
+    StructField("dia_diem_lay_mau", StringType(), True),
+    StructField("ds_bo_chi_dinh_id", StringType(), True),
+    StructField("ds_dich_vu_id", StringType(), True),
+    StructField("hinh_thuc_tt_dv_ngoai_hd", FloatType(), True),
+    StructField("hop_dong_ksk_id", IntegerType(), True),
+    StructField("ma_nhan_vien", StringType(), True),
+    StructField("ngoai_vien", BooleanType(), True),
+    StructField("phong_ban", StringType(), True),
+    StructField("stt", IntegerType(), True),
+    StructField("thoi_gian_hoan_thanh", StringType(), True),
+    StructField("trang_thai", IntegerType(), True),
+    StructField("tu_thoi_gian_kham", StringType(), True),
+    StructField("tu_thoi_gian_lay_mau", StringType(), True),
+    StructField("hinh_thuc_tt_dv_trong_hd", FloatType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
+# Table 11: CT_NGUON_NB
+schema_ct_nguon_nb = StructType([
+    StructField("nb_dot_dieu_tri_id", IntegerType(), True),
+    StructField("ghi_chu", StringType(), True),
+    StructField("nguoi_gioi_thieu_id", FloatType(), True),
+    StructField("nguon_nb_id", FloatType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
+# Table 12: CT_PHIEU_THU
+schema_ct_phieu_thu = StructType([
+    StructField("id", IntegerType(), True),
+    StructField("active", BooleanType(), True),
+    StructField("deleted", IntegerType(), True),
+    StructField("nb_dot_dieu_tri_id", IntegerType(), True),
+    StructField("ca_lam_viec_id", FloatType(), True),
+    StructField("doi_tuong_kcb", IntegerType(), True),
+    StructField("ds_ma_giam_gia_id", StringType(), True),
+    StructField("ghi_chu", StringType(), True),
+    StructField("hinh_thuc_mien_giam", FloatType(), True),
+    StructField("hoa_don_id", StringType(), True),
+    StructField("ky_hieu", StringType(), True),
+    StructField("loai_phieu_thu", IntegerType(), True),
+    StructField("nb_goi_dv_id", StringType(), True),
+    StructField("nha_thu_ngan_id", FloatType(), True),
+    StructField("nho_hon_muc_cung_chi_tra", BooleanType(), True),
+    StructField("phan_tram_mien_giam", FloatType(), True),
+    StructField("quay_id", FloatType(), True),
+    StructField("so_phieu", IntegerType(), True),
+    StructField("thanh_tien", FloatType(), True),
+    StructField("thanh_toan", IntegerType(), True),
+    StructField("thoi_gian_huy_thanh_toan", TimestampType(), True),
+    StructField("thoi_gian_thanh_toan", StringType(), True),
+    StructField("thu_ngan_huy_thanh_toan_id", FloatType(), True),
+    StructField("thu_ngan_id", FloatType(), True),
+    StructField("tien_bh_thanh_toan", FloatType(), True),
+    StructField("tien_bh_thanh_toan_trong_goi", FloatType(), True),
+    StructField("tien_giam_gia", FloatType(), True),
+    StructField("tien_hoan_tra", FloatType(), True),
+    StructField("tien_mien_giam_dich_vu", FloatType(), True),
+    StructField("tien_mien_giam_phieu_thu", FloatType(), True),
+    StructField("tien_mien_giam_phieu_thu_nhap_vao", FloatType(), True),
+    StructField("tien_nb_cung_chi_tra", FloatType(), True),
+    StructField("tien_nb_cung_chi_tra_trong_goi", FloatType(), True),
+    StructField("tien_nb_phu_thu", FloatType(), True),
+    StructField("tien_nb_tu_tra", FloatType(), True),
+    StructField("tien_nguon_khac", FloatType(), True),
+    StructField("tien_tai_tro_bao_hiem", FloatType(), True),
+    StructField("tien_tai_tro_khong_bao_hiem", FloatType(), True),
+    StructField("trang_thai_hoa_don", IntegerType(), True),
+    StructField("hoan_ung", BooleanType(), True),
+    StructField("loai_mien_giam", StringType(), True),
+    StructField("phieu_doi_tra_id", StringType(), True),
+    StructField("thoi_gian_tao_phieu", StringType(), True),
+    StructField("thoi_gian_cap_nhat_phieu", StringType(), True),
+    StructField("created_at", TimestampType(), True),
+    StructField("updated_at", TimestampType(), True)
+])
+
+# --- CONFIG TABLES (IMPORTANT) ---
+# Key: Kafka Topic Name
+# Value: (Iceberg Table Name, Schema)
+TABLE_CONFIGS = {
+    "his.core_his_prod.dm_khoa": {
+        "table_name": "dm_khoa_iceberg",
+        "schema": schema_dm_khoa
+    },
+    "his.core_his_prod.dm_loai_dich_vu": {
+        "table_name": "dm_loai_dich_vu_iceberg",
+        "schema": schema_dm_loai_dich_vu
+    },
+    "his.core_his_prod.ct_address": {
+        "table_name": "ct_address_iceberg",
+        "schema": schema_ct_address
+    },
+    "his.core_his_prod.ct_bo_chi_dinh": {
+        "table_name": "ct_bo_chi_dinh_iceberg",
+        "schema": schema_ct_bo_chi_dinh
+    },
+    "his.core_his_prod.ct_dich_vu": {
+        "table_name": "ct_dich_vu_iceberg",
+        "schema": schema_ct_dich_vu
+    },
+    "his.core_his_prod.ct_dot_dieu_tri": {
+        "table_name": "ct_dot_dieu_tri_iceberg",
+        "schema": schema_ct_dot_dieu_tri
+    },
+    "his.core_his_prod.ct_dv_kham": {
+        "table_name": "ct_dv_kham_iceberg",
+        "schema": schema_ct_dv_kham
+    },
+    "his.core_his_prod.ct_dv_kham_ket_luan": {
+        "table_name": "ct_dv_kham_ket_luan_iceberg",
+        "schema": schema_ct_dv_kham_ket_luan
+    },
+    "his.core_his_prod.ct_dv_ky_thuat": {
+        "table_name": "ct_dv_ky_thuat_iceberg",
+        "schema": schema_ct_dv_ky_thuat
+    },
+    "his.core_his_prod.ct_kham_suc_khoe": {
+        "table_name": "ct_kham_suc_khoe_iceberg",
+        "schema": schema_ct_kham_suc_khoe
+    },
+    "his.core_his_prod.ct_nguon_nb": {
+        "table_name": "ct_nguon_nb_iceberg",
+        "schema": schema_ct_nguon_nb
+    },
+    "his.core_his_prod.ct_phieu_thu": {
+        "table_name": "ct_phieu_thu_iceberg",
+        "schema": schema_ct_phieu_thu
+    },
+    "his.core_his_prod.ct_phieu_thu": {
+        "table_name": "ct_phieu_thu_iceberg",
+        "schema": schema_ct_phieu_thu
+    }
+}

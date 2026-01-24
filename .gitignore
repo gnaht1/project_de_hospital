@@ -215,3 +215,5 @@ derby.log
 *.parquet
 *.avro
 *.orc
+de_tai_cuoi_khoa_DE - Westmead Hospital.txt
+spark/config.py
