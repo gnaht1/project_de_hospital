@@ -91,7 +91,11 @@ def start_stream_for_topic(spark, topic, conf):
     df_parsed = df_kafka.selectExpr("CAST(value AS STRING) as json") \
         .select(from_json(col("json"), envelope_schema).alias("data")) \
         .select("data.after.*", "data.op") \
-        .filter("op != 'd'") # Lọc bản ghi xóa
+        .filter("op != 'd'")  # Lọc bản ghi xóa
+    
+    if table_name == "dm_khoa_iceberg":
+        print(f">>> ĐANG ÁP DỤNG FILTER CHO BẢNG: {table_name}") # <--- Thêm dòng này để check
+        df_parsed = df_parsed.filter("ten != 'TEST_01'")
 
     # 4. Ghi xuống Iceberg
     query = df_parsed.writeStream \
