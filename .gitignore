@@ -205,3 +205,15 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Spark & Hadoop temporary files
+# These directories are used by Spark for local temp storage, shuffle data, and S3A buffering
+tmp/
+spark-warehouse/
+metastore_db/
+derby.log
+*.parquet
+*.avro
+*.orc
+de_tai_cuoi_khoa_DE - Westmead Hospital.txt
+spark/config.py
