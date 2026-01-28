@@ -219,4 +219,4 @@ de_tai_cuoi_khoa_DE - Westmead Hospital.txt
 spark/config.py
 
 # DB Diagram
-dbdiagram/core_hospital.dbdiagram
+docs/dbdiagram/core_hospital.dbdiagram

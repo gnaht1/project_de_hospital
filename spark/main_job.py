@@ -93,6 +93,19 @@ def start_stream_for_topic(spark, topic, conf):
         .select("data.after.*", "data.op") \
         .filter("op != 'd'")  # Lọc bản ghi xóa
     
+    # 3.1. Đảm bảo tất cả các field trong schema đều có trong DataFrame
+    # Nếu thiếu field nào, thêm vào với giá trị NULL
+    from pyspark.sql.functions import lit
+    existing_columns = set(df_parsed.columns)
+    target_columns = [field.name for field in target_schema.fields]
+    
+    for col_name in target_columns:
+        if col_name not in existing_columns:
+            df_parsed = df_parsed.withColumn(col_name, lit(None).cast(StringType()))
+    
+    # Chọn đúng thứ tự các cột theo target_schema
+    df_parsed = df_parsed.select(*target_columns)
+    
     if table_name == "dm_khoa_iceberg":
         print(f">>> ĐANG ÁP DỤNG FILTER CHO BẢNG: {table_name}") # <--- Thêm dòng này để check
         df_parsed = df_parsed.filter("ten != 'TEST_01'")

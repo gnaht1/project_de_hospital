@@ -18,52 +18,151 @@ Table ct_address [note: "Bảng lưu thông tin địa chỉ cư trú, tạm tr�
   updated_at datetime [note: "Thời điểm cập nhật bản ghi gần nhất"]
 }
 
+Ref: ct_address.nb_dot_dieu_tri_id > ct_dot_dieu_tri.id
+Ref: ct_address.xa_phuong_id > dm_xa_phuong.xa_phuong_id
+Ref: ct_address.xa_phuong_tam_tru_id > dm_xa_phuong.xa_phuong_id
+Ref: ct_address.quan_huyen_id > dm_quan_huyen.id
+Ref: ct_address.quan_huyen_tam_tru_id > dm_quan_huyen.id
+Ref: ct_address.tinh_thanh_pho_id > dm_tinh_thanh_pho.id
+Ref: ct_address.tinh_thanh_pho_tam_tru_id > dm_tinh_thanh_pho.id
+
 // Table 2: ct_bo_chi_dinh
 Table ct_bo_chi_dinh [note: "Bảng lưu thông tin các bộ chỉ định được áp dụng cho từng đợt điều trị của người bệnh"] {
   id int [pk, note: "Khóa chính của bảng, định danh duy nhất mỗi bản ghi"]
   nb_dot_dieu_tri_id int [note: "ID đợt điều trị của người bệnh (foreign key tới bảng đợt điều trị)"]
   bo_chi_dinh_id int [note: "ID bộ chỉ định (foreign key tới danh mục bộ chỉ định)"]
-  thoi_gian_chi_dinh string [note: "Thời gian chỉ định (định dạng string theo dữ liệu nguồn)"]
+  thoi_gian_chi_dinh string [note: "Thời gian chỉ định"]
   active boolean [note: "Trạng thái hiệu lực của bản ghi: true = đang hoạt động"]
-  deleted int [note: "Cờ xóa logic (soft delete): 0 = chưa xóa, 1 = đã xóa"]
+  deleted int [note: "Flag xóa logic (soft delete): 0 = chưa xóa, 1 = đã xóa"]
   created_at datetime [note: "Thời điểm tạo bản ghi"]
   updated_at datetime [note: "Thời điểm cập nhật bản ghi gần nhất"]
 }
 
+Ref: ct_bo_chi_dinh.nb_dot_dieu_tri_id > ct_dot_dieu_tri.id
+Ref: ct_bo_chi_dinh.bo_chi_dinh_id > dm_bo_chi_dinh.id
+
 // Table 3: ct_dich_vu
-Table ct_dich_vu [note: "Bảng lưu thông tin dịch vụ được chỉ định cho người bệnh theo từng đợt điều trị (gắn với bộ chỉ định)"] {
-  id int [pk, note: "Khóa chính của bảng, định danh duy nhất mỗi bản ghi"]
-  nb_dot_dieu_tri_id int [note: "ID đợt điều trị của người bệnh (foreign key)"]
-  bo_chi_dinh_id int [note: "ID bộ chỉ định liên quan đến dịch vụ (foreign key)"]
-  thoi_gian_chi_dinh string [note: "Thời gian chỉ định dịch vụ (định dạng string theo dữ liệu nguồn)"]
-  active boolean [note: "Trạng thái hiệu lực của bản ghi: true = đang hoạt động"]
-  deleted int [note: "Cờ xóa logic (soft delete): 0 = chưa xóa, 1 = đã xóa"]
+Table ct_dich_vu [note: "Bảng chi tiết dịch vụ (thuốc, vật tư, CLS...) được chỉ định cho người bệnh"] {
+  // --- Khóa & Định danh ---
+  id int [pk, note: "Khóa chính"]
+  nb_dot_dieu_tri_id int [note: "Khóa ngoại: Liên kết với đợt điều trị của người bệnh"]
+  nb_bo_chi_dinh_id int [note: "Khóa ngoại: Liên kết với bộ chỉ định (nếu có)"]
+  dich_vu_id int [note: "Khóa ngoại: Liên kết với danh mục dịch vụ (dm_dich_vu)"]
+  
+  // --- Hành chính & Phân loại ---
+  bac_si_chi_dinh_id int [note: "Khóa ngoại: ID bác sĩ chỉ định"]
+  khoa_chi_dinh_id int [note: "Khóa ngoại: ID khoa chỉ định"]
+  doi_tuong_kcb int [note: "Khóa ngoại: Đối tượng bệnh nhân tại thời điểm chỉ định"]
+  loai_doi_tuong_id int [note: "Khóa ngoại: Phân loại chi tiết đối tượng"]
+  loai_dich_vu int [note: "Khóa ngoại: Loại dịch vụ (Ví dụ: Khám, XN, X-Quang)"]
+  nb_chuyen_khoa_id int [note: "ID chuyên khoa của người bệnh"]
+  
+  // --- Nguồn & Theo dõi ---
+  chi_dinh_tu_dich_vu_id int [note: "ID dịch vụ nguồn đã kích hoạt chỉ định này (Đệ quy hoặc tham chiếu chéo)"]
+  chi_dinh_tu_loai_dich_vu int [note: "Loại của dịch vụ nguồn"]
+  stt_hien_thi int [note: "Số thứ tự hiển thị"]
+  ghi_chu string [note: "Ghi chú lâm sàng hoặc hướng dẫn"]
+  
+  // --- Tài chính: Giá cả ---
+  gia_bao_hiem float [note: "Đơn giá bảo hiểm chi trả"]
+  gia_goc float [note: "Giá gốc của dịch vụ"]
+  gia_khong_bao_hiem float [note: "Đơn giá thu phí (đối tượng không BHYT)"]
+  gia_phu_thu float [note: "Số tiền phụ thu"]
+  dv_gia_id int [note: "ID cấu hình giá cụ thể được áp dụng"]
+  
+  // --- Tài chính: Thanh toán & Tính toán ---
+  so_luong float [note: "Số lượng chỉ định"]
+  thanh_toan int [note: "Trạng thái thanh toán (0: Chưa, 1: Đã thanh toán)"]
+  phieu_thu_id int [note: "Khóa ngoại: ID phiếu thu tiền"]
+  phat_hanh_hoa_don boolean [note: "Flag: Trạng thái đã xuất hóa đơn"]
+  loai_hinh_thanh_toan_id int [note: "ID hình thức thanh toán"]
+  
+  // --- Tài chính: Miễn giảm & Ngoại lệ ---
+  khong_thu_tien boolean [note: "Flag: Không thu tiền dịch vụ này"]
+  khong_tinh_tien boolean [note: "Flag: Không tính tiền (Miễn phí hoàn toàn)"]
+  mien_cung_chi_tra boolean [note: "Flag: Miễn phần cùng chi trả"]
+  muc_huong float [note: "Mức hưởng bảo hiểm (%)"]
+  
+  // Chi tiết tiền giảm giá/miễn giảm
+  phan_tram_mien_giam_dich_vu_bh float [note: "% miễn giảm trên phần BHYT chi trả"]
+  phan_tram_mien_giam_dich_vu_khong_bh float [note: "% miễn giảm trên phần không BHYT"]
+  tien_giam_gia_bh float [note: "Số tiền giảm giá trên phần BHYT"]
+  tien_giam_gia_khong_bh float [note: "Số tiền giảm giá trên phần không BHYT"]
+  tien_mien_giam_dich_vu_bh float [note: "Số tiền miễn giảm trên phần BHYT"]
+  tien_mien_giam_dich_vu_khong_bh float [note: "Số tiền miễn giảm trên phần không BHYT"]
+  tien_mien_giam_dich_vu_nhap_vao float [note: "Số tiền miễn giảm nhập tay trực tiếp"]
+  tien_mien_giam_phieu_thu_bh float [note: "Tiền miễn giảm phiếu thu phân bổ vào phần BHYT"]
+  tien_mien_giam_phieu_thu_khong_bh float [note: "Tiền miễn giảm phiếu thu phân bổ vào phần không BHYT"]
+  
+  // Chi tiết số tiền thanh toán cuối cùng
+  tien_bh_thanh_toan float [note: "Số tiền Bảo hiểm thanh toán"]
+  tien_nb_cung_chi_tra float [note: "Số tiền người bệnh cùng chi trả"]
+  tien_nb_phu_thu float [note: "Số tiền người bệnh trả phụ thu"]
+  tien_nb_trai_tuyen float [note: "Số tiền người bệnh trả trái tuyến"]
+  tien_nb_tu_tra float [note: "Số tiền người bệnh tự trả hoàn toàn"]
+  tien_nguon_khac float [note: "Số tiền từ nguồn khác chi trả"]
+  
+  // Tỷ lệ
+  ty_le_bh_tt float [note: "Tỷ lệ bảo hiểm thanh toán"]
+  ty_le_tt_dv float [note: "Tỷ lệ thanh toán theo dịch vụ"]
+  
+  // --- Thời gian ---
+  thoi_gian_chi_dinh datetime [note: "Thời gian chỉ định"]
+  thoi_gian_thuc_hien datetime [note: "Thời gian thực hiện"]
+  
+  // --- Bên ngoài & Gói ---
+  ngoai_vien boolean [note: "Flag: Dịch vụ thực hiện ngoại viện"]
+  ngoai_vien_id int [note: "ID đơn vị ngoại viện"]
+  nguon_khac_id int [note: "ID nguồn tài trợ khác"]
+  nb_goi_dv_chi_tiet_id int [note: "Liên kết chi tiết gói dịch vụ"]
+  nb_goi_pt_tt_id int [note: "Liên kết gói Phẫu thuật thủ thuật"]
+  nb_the_bao_hiem_id int [note: "Liên kết thẻ bảo hiểm người bệnh"]
+  nb_phac_do_dieu_tri_id int [note: "Liên kết phác đồ điều trị"]
+  phac_do_dieu_tri_dich_vu_id int [note: "Liên kết dịch vụ trong phác đồ"]
+  
+  // --- Trạng thái & Hệ thống ---
+  phieu_doi_tra_id int [note: "Liên kết phiếu đổi trả (nếu có hoàn trả)"]
+  trang_thai_hoan int [note: "Trạng thái hoàn tiền"]
+  tu_tra boolean [note: "Flag: Bệnh nhân tự chi trả"]
+  dung_tuyen boolean [note: "Flag: Đúng tuyến bảo hiểm"]
+  
+  active boolean [note: "Trạng thái hoạt động của bản ghi"]
+  deleted int [note: "Flag xóa mềm (0: Chưa xóa, 1: Đã xóa)"]
   created_at datetime [note: "Thời điểm tạo bản ghi"]
   updated_at datetime [note: "Thời điểm cập nhật bản ghi gần nhất"]
 }
+
+Ref: ct_dich_vu.nb_dot_dieu_tri_id > ct_dot_dieu_tri.id
+Ref: ct_dich_vu.dich_vu_id > dm_dich_vu.id
+Ref: ct_dich_vu.nb_bo_chi_dinh_id > ct_bo_chi_dinh.id
+Ref: ct_dich_vu.bac_si_chi_dinh_id > dm_nhan_vien.id
+Ref: ct_dich_vu.khoa_chi_dinh_id > dm_khoa.id
+Ref: ct_dich_vu.phieu_thu_id > ct_phieu_thu.id
+Ref: ct_dich_vu.loai_dich_vu > dm_loai_dich_vu.id
+Ref: ct_dich_vu.doi_tuong_kcb > dm_doi_tuong_kcb.id
 
 // Table 4: ct_dot_dieu_tri
 Table ct_dot_dieu_tri [note: "Bảng trung tâm lưu thông tin đợt điều trị của người bệnh, bao gồm thông tin hành chính, phân loại, thời gian điều trị và trạng thái hồ sơ"] {
   id int [pk, note: "Khóa chính của bảng, định danh duy nhất mỗi đợt điều trị"]
-  cap_cuu boolean [note: "Cờ xác định đợt điều trị cấp cứu"]
-  chi_nam_sinh boolean [note: "Cờ cho biết chỉ có thông tin năm sinh (không có ngày/tháng sinh)"]
+  cap_cuu boolean [note: "Flag xác định đợt điều trị cấp cứu"]
+  chi_nam_sinh boolean [note: "Flag cho biết chỉ có thông tin năm sinh (không có ngày/tháng sinh)"]
   dan_toc_id float [note: "ID dân tộc của người bệnh"]
   doi_tuong int [note: "Đối tượng người bệnh (theo phân loại nội bộ)"]
-  doi_tuong_kcb int [note: "Đối tượng khám chữa bệnh"]
+  doi_tuong_kcb int [note: "Đối tượng khám chữa bệnh(FK)"]
   gioi_tinh int [note: "Giới tính người bệnh"]
-  kham_suc_khoe boolean [note: "Cờ xác định đợt khám sức khỏe"]
-  khoa_id int [note: "ID khoa điều trị hiện tại"]
-  khoa_tiep_don_id int [note: "ID khoa tiếp đón ban đầu"]
+  kham_suc_khoe boolean [note: "Flag xác định đợt khám sức khỏe"]
+  khoa_id int [note: "ID khoa điều trị hiện tại(FK)"]
+  khoa_tiep_don_id int [note: "ID khoa tiếp đón ban đầu(FK)"]
   loai_benh_an_id string [note: "Loại bệnh án"]
   loai_doi_tuong_id float [note: "ID loại đối tượng người bệnh"]
   ma_benh_an string [note: "Mã bệnh án"]
   ma_ho_so int [note: "Mã hồ sơ"]
   ma_nb int [note: "Mã người bệnh"]
-  mac_dinh boolean [note: "Cờ đánh dấu đợt điều trị mặc định"]
+  mac_dinh boolean [note: "Flag đánh dấu đợt điều trị mặc định"]
   nb_thong_tin_id int [note: "ID bảng thông tin người bệnh (foreign key)"]
   ngay_sinh string [note: "Ngày sinh người bệnh (định dạng string theo dữ liệu nguồn)"]
   nghe_nghiep_id string [note: "ID nghề nghiệp của người bệnh"]
-  ngoai_vien boolean [note: "Cờ xác định người bệnh ngoại viện"]
+  ngoai_vien boolean [note: "Flag xác định người bệnh ngoại viện"]
   nguoi_lap_benh_an_id string [note: "ID người lập bệnh án"]
   nhom_mau string [note: "Nhóm máu của người bệnh"]
   noi_lam_viec string [note: "Nơi làm việc của người bệnh"]
@@ -78,9 +177,9 @@ Table ct_dot_dieu_tri [note: "Bảng trung tâm lưu thông tin đợt điều t
   thoi_gian_lap_benh_an string [note: "Thời gian lập bệnh án"]
   thoi_gian_ra_vien string [note: "Thời gian ra viện"]
   thoi_gian_vao_vien string [note: "Thời gian vào viện"]
-  tiem_chung boolean [note: "Cờ xác định có tiêm chủng"]
+  tiem_chung boolean [note: "Flag xác định có tiêm chủng"]
   trang_thai int [note: "Trạng thái đợt điều trị"]
-  uu_tien boolean [note: "Cờ ưu tiên (VIP / ưu tiên khám chữa bệnh)"]
+  uu_tien boolean [note: "Flag ưu tiên (VIP / ưu tiên khám chữa bệnh)"]
   duyet_chi_phi string [note: "Trạng thái duyệt chi phí"]
   bang_lai_xe_id string [note: "ID bằng lái xe (nếu có)"]
   ma_doi_tuong_kcb_id string [note: "Mã đối tượng khám chữa bệnh"]
@@ -93,36 +192,45 @@ Table ct_dot_dieu_tri [note: "Bảng trung tâm lưu thông tin đợt điều t
   nguoi_tu_choi_duyet_chi_phi_id string [note: "ID người từ chối duyệt chi phí"]
   loai_lien_ket string [note: "Loại liên kết người bệnh"]
   nb_lien_ket_id string [note: "ID người bệnh liên kết"]
-  ho_ngheo boolean [note: "Cờ xác định người bệnh thuộc hộ nghèo"]
+  ho_ngheo boolean [note: "Flag xác định người bệnh thuộc hộ nghèo"]
   active boolean [note: "Trạng thái hiệu lực của bản ghi"]
-  deleted int [note: "Cờ xóa logic (soft delete): 0 = chưa xóa, 1 = đã xóa"]
+  deleted int [note: "Flag xóa logic (soft delete): 0 = chưa xóa, 1 = đã xóa"]
   created_at datetime [note: "Thời điểm tạo bản ghi"]
   updated_at datetime [note: "Thời điểm cập nhật bản ghi gần nhất"]
 }
+
+Ref: ct_dot_dieu_tri.doi_tuong_kcb > dm_doi_tuong_kcb.id
+Ref: ct_dot_dieu_tri.khoa_id > dm_khoa.id
+Ref: ct_dot_dieu_tri.khoa_tiep_don_id > dm_khoa.id
+Ref: ct_dot_dieu_tri.nb_thong_tin_id > dm_benh_nhan.nb_thong_tin_id
 
 // Table 5: ct_dv_kham
 Table ct_dv_kham [note: "Bảng lưu thông tin dịch vụ khám bệnh của người bệnh theo từng đợt điều trị"] {
   id int [pk, note: "Khóa chính của bảng, định danh duy nhất mỗi dịch vụ khám"]
   nb_dot_dieu_tri_id int [note: "ID đợt điều trị của người bệnh (foreign key)"]
-  bac_si_ket_luan_id float [note: "ID bác sĩ kết luận khám"]
-  bac_si_kham_id float [note: "ID bác sĩ trực tiếp khám"]
-  dot_kham_moi boolean [note: "Cờ xác định đây là đợt khám mới"]
+  bac_si_ket_luan_id float [note: "ID bác sĩ kết luận khám (FK)"]
+  bac_si_kham_id float [note: "ID bác sĩ trực tiếp khám (FK)"]
+  dot_kham_moi boolean [note: "Flag xác định đây là đợt khám mới"]
   nguoi_phien_dich_id string [note: "ID người phiên dịch (nếu có)"]
   stt_chuyen_khoa string [note: "Số thứ tự khám theo chuyên khoa"]
   thiet_lap string [note: "Thiết lập/ghi chú liên quan đến dịch vụ khám"]
   thoi_gian_kham string [note: "Thời gian bắt đầu khám"]
   thoi_gian_ket_luan string [note: "Thời gian kết luận khám"]
   active boolean [note: "Trạng thái hiệu lực của bản ghi"]
-  deleted int [note: "Cờ xóa logic (soft delete): 0 = chưa xóa, 1 = đã xóa"]
+  deleted int [note: "Flag xóa logic (soft delete): 0 = chưa xóa, 1 = đã xóa"]
   created_at datetime [note: "Thời điểm tạo bản ghi"]
   updated_at datetime [note: "Thời điểm cập nhật bản ghi gần nhất"]
 }
+
+Ref: ct_dv_kham.nb_dot_dieu_tri_id > ct_dot_dieu_tri.id
+Ref: ct_dv_kham.bac_si_ket_luan_id > dm_nhan_vien.id
+Ref: ct_dv_kham.bac_si_kham_id > dm_nhan_vien.id
 
 // Table 6: ct_dv_kham_ket_luan
 Table ct_dv_kham_ket_luan [note: "Bảng lưu thông tin kết luận khám bệnh và định hướng điều trị cho người bệnh theo từng đợt điều trị"] {
   id int [pk, note: "Khóa chính của bảng, định danh duy nhất mỗi bản ghi kết luận khám"]
   nb_dot_dieu_tri_id int [note: "ID đợt điều trị của người bệnh (foreign key)"]
-  huong_dieu_tri float [note: "Hướng điều trị được chỉ định"]
+  huong_dieu_tri float [note: "Hướng điều trị được chỉ định (FK)"]
   ket_qua_dieu_tri float [note: "Kết quả điều trị"]
   loi_dan string [note: "Lời dặn của bác sĩ dành cho người bệnh"]
   phong_hen_kham_id float [note: "ID phòng hẹn khám / tái khám"]
@@ -137,40 +245,46 @@ Table ct_dv_kham_ket_luan [note: "Bảng lưu thông tin kết luận khám bệ
   updated_at datetime [note: "Thời điểm cập nhật bản ghi gần nhất"]
 }
 
+Ref: ct_dv_kham_ket_luan.nb_dot_dieu_tri_id > ct_dot_dieu_tri.id
+Ref: ct_dv_kham_ket_luan.huong_dieu_tri > dm_loai_dich_vu.id
+
 // Table 7: ct_dv_ky_thuat
 Table ct_dv_ky_thuat [note: "Bảng lưu thông tin dịch vụ kỹ thuật được chỉ định/thực hiện cho người bệnh theo từng đợt điều trị"] {
   id int [pk, note: "Khóa chính của bảng, định danh duy nhất mỗi dịch vụ kỹ thuật"]
   nb_dot_dieu_tri_id int [note: "ID đợt điều trị của người bệnh (foreign key)"]
-  cap_cuu boolean [note: "Cờ xác định dịch vụ kỹ thuật thuộc trường hợp cấp cứu"]
-  hinh_thuc_tt_ksk float [note: "Hình thức thanh toán/khám sức khỏe (theo phân loại nguồn)"]
-  in_phieu_chi_dinh int [note: "Cờ/in trạng thái in phiếu chỉ định"]
+  cap_cuu boolean [note: "Flag xác định dịch vụ kỹ thuật thuộc trường hợp cấp cứu"]
+  hinh_thuc_tt_ksk float [note: "Hình thức thanh toán/khám sức khỏe"]
+  in_phieu_chi_dinh int [note: "Flag trạng thái in phiếu chỉ định"]
   ngoai_vien_id string [note: "ID đơn vị/ngoại viện liên quan (nếu có)"]
-  phieu_in_id float [note: "ID phiếu in"]
-  phong_thuc_hien_id float [note: "ID phòng thực hiện dịch vụ kỹ thuật"]
+  phieu_in_id float [note: "ID phiếu in (Phiếu chỉ định)"]
+  phong_thuc_hien_id float [note: "ID phòng thực hiện dịch vụ kỹ thuật (FK)"]
   so_lan_goi float [note: "Số lần gọi người bệnh"]
   so_phieu_id float [note: "ID số phiếu"]
   stt float [note: "Số thứ tự thực hiện"]
-  tam_ung boolean [note: "Cờ xác định có tạm ứng"]
-  thanh_toan_sau boolean [note: "Cờ xác định thanh toán sau"]
-  theo_yeu_cau boolean [note: "Cờ xác định dịch vụ theo yêu cầu"]
+  tam_ung boolean [note: "Flag xác định có tạm ứng"]
+  thanh_toan_sau boolean [note: "Flag xác định thanh toán sau"]
+  theo_yeu_cau boolean [note: "Flag xác định dịch vụ theo yêu cầu"]
   thoi_gian_lay_so string [note: "Thời gian lấy số"]
   thoi_gian_tiep_nhan string [note: "Thời gian tiếp nhận"]
-  thuc_hien_tai_khoa boolean [note: "Cờ xác định thực hiện tại khoa"]
-  trang_thai int [note: "Trạng thái thực hiện dịch vụ kỹ thuật"]
+  thuc_hien_tai_khoa boolean [note: "Flag xác định thực hiện tại khoa"]
+  trang_thai int [note: "Trạng thái thực hiện dịch vụ kỹ thuật (Refers to hospital_configs (table='ct_dv_ky_thuat', col='trang_thai'))"]
   tu_van_vien_id string [note: "ID tư vấn viên"]
-  uu_tien boolean [note: "Cờ ưu tiên thực hiện"]
+  uu_tien boolean [note: "Flag ưu tiên thực hiện"]
   ly_do_khong_thuc_hien string [note: "Lý do không thực hiện dịch vụ"]
   thoi_gian_xac_nhan_khong_thuc_hien string [note: "Thời gian xác nhận không thực hiện"]
-  khong_thuc_hien boolean [note: "Cờ xác định không thực hiện dịch vụ"]
+  khong_thuc_hien boolean [note: "Flag xác định không thực hiện dịch vụ"]
   ly_doi_khong_thuc_hien string [note: "Lý do đổi/không thực hiện dịch vụ"]
   trang_thai_thong_bao string [note: "Trạng thái thông báo liên quan dịch vụ"]
   thoi_gian_bat_dau string [note: "Thời gian bắt đầu thực hiện"]
   thoi_gian_hoan_thanh string [note: "Thời gian hoàn thành thực hiện"]
   active boolean [note: "Trạng thái hiệu lực của bản ghi"]
-  deleted int [note: "Cờ xóa logic (soft delete): 0 = chưa xóa, 1 = đã xóa"]
+  deleted int [note: "Flag xóa logic (soft delete): 0 = chưa xóa, 1 = đã xóa"]
   created_at datetime [note: "Thời điểm tạo bản ghi"]
   updated_at datetime [note: "Thời điểm cập nhật bản ghi gần nhất"]
 }
+
+Ref: ct_dv_ky_thuat.nb_dot_dieu_tri_id > ct_dot_dieu_tri.id
+Ref: ct_dv_ky_thuat.phong_thuc_hien_id > dm_phong.id
 
 // Table 8: ct_kham_suc_khoe
 Table ct_kham_suc_khoe [note: "Bảng lưu thông tin khám sức khỏe (KSK) của người bệnh/nhân viên, bao gồm thời gian, địa điểm, dịch vụ và trạng thái thực hiện"] {
@@ -180,12 +294,12 @@ Table ct_kham_suc_khoe [note: "Bảng lưu thông tin khám sức khỏe (KSK) c
   den_thoi_gian_lay_mau string [note: "Thời gian kết thúc lấy mẫu"]
   dia_diem_kham string [note: "Địa điểm thực hiện khám sức khỏe"]
   dia_diem_lay_mau string [note: "Địa điểm thực hiện lấy mẫu"]
-  ds_bo_chi_dinh_id string [note: "Danh sách ID bộ chỉ định liên quan (theo dữ liệu nguồn)"]
+  ds_bo_chi_dinh_id string [note: "Danh sách ID bộ chỉ định liên quan (theo dữ liệu nguồn) (FK)"]
   ds_dich_vu_id string [note: "Danh sách ID dịch vụ liên quan (theo dữ liệu nguồn)"]
   hinh_thuc_tt_dv_ngoai_hd float [note: "Hình thức thanh toán dịch vụ ngoài hợp đồng"]
   hop_dong_ksk_id int [note: "ID hợp đồng khám sức khỏe (foreign key)"]
   ma_nhan_vien string [note: "Mã nhân viên/người được khám"]
-  ngoai_vien boolean [note: "Cờ xác định khám sức khỏe ngoại viện"]
+  ngoai_vien boolean [note: "Flag xác định khám sức khỏe ngoại viện"]
   phong_ban string [note: "Phòng ban công tác"]
   stt int [note: "Số thứ tự khám sức khỏe"]
   thoi_gian_hoan_thanh string [note: "Thời gian hoàn thành toàn bộ khám sức khỏe"]
@@ -197,24 +311,31 @@ Table ct_kham_suc_khoe [note: "Bảng lưu thông tin khám sức khỏe (KSK) c
   updated_at datetime [note: "Thời điểm cập nhật bản ghi gần nhất"]
 }
 
+Ref: ct_kham_suc_khoe.ds_bo_chi_dinh_id > dm_bo_chi_dinh.id
+Ref: ct_kham_suc_khoe.hop_dong_ksk_id > dm_hop_dong_ksk.id
+
 // Table 9: ct_nguon_nb
 Table ct_nguon_nb [note: "Bảng lưu thông tin nguồn người bệnh và người giới thiệu gắn với từng đợt điều trị"] {
-  nb_dot_dieu_tri_id int [note: "ID đợt điều trị của người bệnh (foreign key, không phải khóa chính)"]
+  nb_dot_dieu_tri_id int [note: "ID đợt điều trị của người bệnh (foreign key, không phải PK)"]
   ghi_chu string [note: "Ghi chú bổ sung về nguồn người bệnh"]
-  nguoi_gioi_thieu_id float [note: "ID người giới thiệu người bệnh"]
-  nguon_nb_id float [note: "ID nguồn người bệnh (kênh/nguồn tiếp cận)"]
+  nguoi_gioi_thieu_id float [note: "ID người giới thiệu người bệnh (FK)"]
+  nguon_nb_id float [note: "ID nguồn người bệnh (kênh/nguồn tiếp cận) (FK)"]
   created_at datetime [note: "Thời điểm tạo bản ghi"]
   updated_at datetime [note: "Thời điểm cập nhật bản ghi gần nhất"]
 }
+
+Ref: ct_nguon_nb.nb_dot_dieu_tri_id > ct_dot_dieu_tri.id
+Ref: ct_nguon_nb.nguoi_gioi_thieu_id > dm_nguoi_gioi_thieu.id
+Ref: ct_nguon_nb.nguon_nb_id > dm_nguon_nb.id
 
 // Table 10: ct_phieu_thu
 Table ct_phieu_thu [note: "Bảng lưu thông tin phiếu thu/thanh toán của người bệnh theo từng đợt điều trị, bao gồm chi tiết tiền, miễn giảm và trạng thái hóa đơn"] {
   id int [pk, note: "Khóa chính của bảng, định danh duy nhất mỗi phiếu thu"]
   active boolean [note: "Trạng thái hiệu lực của phiếu thu"]
-  deleted int [note: "Cờ xóa logic (soft delete): 0 = chưa xóa, 1 = đã xóa"]
+  deleted int [note: "Flag xóa logic (soft delete): 0 = chưa xóa, 1 = đã xóa"]
   nb_dot_dieu_tri_id int [note: "ID đợt điều trị của người bệnh (foreign key)"]
   ca_lam_viec_id float [note: "ID ca làm việc của thu ngân"]
-  doi_tuong_kcb int [note: "Đối tượng khám chữa bệnh"]
+  doi_tuong_kcb int [note: "Đối tượng khám chữa bệnh (FK)"]
   ds_ma_giam_gia_id string [note: "Danh sách mã giảm giá áp dụng"]
   ghi_chu string [note: "Ghi chú liên quan đến phiếu thu"]
   hinh_thuc_mien_giam float [note: "Hình thức miễn giảm"]
@@ -223,7 +344,7 @@ Table ct_phieu_thu [note: "Bảng lưu thông tin phiếu thu/thanh toán của 
   loai_phieu_thu int [note: "Loại phiếu thu"]
   nb_goi_dv_id string [note: "ID gói dịch vụ người bệnh (nếu có)"]
   nha_thu_ngan_id float [note: "ID nhà thu ngân/quầy thu ngân"]
-  nho_hon_muc_cung_chi_tra boolean [note: "Cờ xác định số tiền nhỏ hơn mức cùng chi trả"]
+  nho_hon_muc_cung_chi_tra boolean [note: "Flag xác định số tiền nhỏ hơn mức cùng chi trả"]
   phan_tram_mien_giam float [note: "Phần trăm miễn giảm"]
   quay_id float [note: "ID quầy thu ngân"]
   so_phieu int [note: "Số phiếu thu"]
@@ -248,7 +369,7 @@ Table ct_phieu_thu [note: "Bảng lưu thông tin phiếu thu/thanh toán của 
   tien_tai_tro_bao_hiem float [note: "Số tiền tài trợ bảo hiểm"]
   tien_tai_tro_khong_bao_hiem float [note: "Số tiền tài trợ không qua bảo hiểm"]
   trang_thai_hoa_don int [note: "Trạng thái hóa đơn"]
-  hoan_ung boolean [note: "Cờ xác định hoàn ứng"]
+  hoan_ung boolean [note: "Flag xác định hoàn ứng"]
   loai_mien_giam string [note: "Loại miễn giảm áp dụng"]
   phieu_doi_tra_id string [note: "ID phiếu đổi/trả liên quan"]
   thoi_gian_tao_phieu string [note: "Thời gian tạo phiếu thu"]
@@ -257,12 +378,356 @@ Table ct_phieu_thu [note: "Bảng lưu thông tin phiếu thu/thanh toán của 
   updated_at datetime [note: "Thời điểm cập nhật bản ghi gần nhất"]
 }
 
+Ref: ct_phieu_thu.nb_dot_dieu_tri_id > ct_dot_dieu_tri.id
+Ref: ct_phieu_thu.doi_tuong_kcb > dm_doi_tuong_kcb.id
+Ref: ct_phieu_thu.thu_ngan_id > dm_nhan_vien.id
+
+// Table 11: dm_benh_nhan
+Table dm_benh_nhan [note: "Bảng danh mục lưu trữ thông tin chi tiết của người bệnh"] {
+  nb_thong_tin_id int [pk, note: "Khóa chính: ID định danh duy nhất thông tin người bệnh"]
+  ma_nb int [note: "Mã người bệnh (mã nghiệp vụ dùng để quản lý hồ sơ)"]
+  email string [note: "Địa chỉ thư điện tử của người bệnh"]
+  ngay_sinh string [note: "Ngày tháng năm sinh (lưu dưới dạng chuỗi)"]
+  noi_lam_viec string [note: "Tên cơ quan hoặc nơi làm việc hiện tại của người bệnh"]
+  so_dien_thoai string [note: "Số điện thoại liên lạc chính"]
+  ten_nb string [note: "Họ và tên đầy đủ của người bệnh"]
+  ten_nb_khong_dau string [note: "Họ và tên dạng không dấu (phục vụ mục đích tìm kiếm)"]
+  created_at timestamp [note: "Thời điểm bản ghi được tạo"]
+  updated_at timestamp [note: "Thời điểm bản ghi được cập nhật gần nhất"]
+}
+
+// Table 12: dm_bo_chi_dinh
+Table dm_bo_chi_dinh [note: "Bảng danh mục các bộ chỉ định (nhóm dịch vụ/thuốc mẫu dùng để kê nhanh)"] {
+  id int [pk, note: "Khóa chính: ID định danh duy nhất của bộ chỉ định"]
+  code_bo_chi_dinh string [note: "Mã định danh nghiệp vụ của bộ chỉ định"]
+  ten string [note: "Tên hiển thị của bộ chỉ định"]
+  ds_bac_si_chi_dinh_id string [note: "Danh sách ID các bác sĩ được phép sử dụng bộ chỉ định này (lưu dạng chuỗi/mảng)"]
+  ds_doi_tuong_su_dung string [note: "Danh sách các đối tượng bệnh nhân áp dụng (FK)"]
+  ds_kho_id string [note: "Danh sách ID các kho liên quan đến bộ chỉ định "]
+  ds_loai_dich_vu string [note: "Danh sách phân loại dịch vụ có trong bộ (FK)"]
+  han_che_khoa_chi_dinh boolean [note: "Flag xác định có hạn chế khoa phòng chỉ định hay không"]
+  hop_dong_ksk_id float [note: "ID hợp đồng khám sức khỏe liên kết (nếu bộ chỉ định thuộc gói KSK) (FK)"]
+  thuoc_chi_dinh_ngoai boolean [note: "Flag đánh dấu thuộc phạm vi chỉ định ngoài"]
+  ket_qua_lau boolean [note: "Flag đánh dấu bộ chỉ định bao gồm các dịch vụ có thời gian trả kết quả lâu"]
+  active boolean [note: "Trạng thái hoạt động (True: Đang sử dụng, False: Tạm ngưng)"]
+  deleted int [note: "Flag (0: Chưa xóa, 1: Đã xóa)"]
+  created_at timestamp [note: "Thời điểm tạo bản ghi"]
+  updated_at timestamp [note: "Thời điểm cập nhật bản ghi gần nhất"]
+}
+
+Ref: dm_bo_chi_dinh.ds_bac_si_chi_dinh_id > dm_nhan_vien.id
+Ref: dm_bo_chi_dinh.ds_doi_tuong_su_dung > dm_doi_tuong_kcb.id
+Ref: dm_bo_chi_dinh.ds_loai_dich_vu > dm_loai_dich_vu.id
+Ref: dm_bo_chi_dinh.hop_dong_ksk_id > dm_hop_dong_ksk.id
 
 
 
+// Table 13: dm_chuyen_khoa
+Table dm_chuyen_khoa [note: "Bảng danh mục chuyên khoa (ví dụ: Nội, Ngoại, Sản, Nhi...)"] {
+  id int [pk, note: "Khóa chính: ID định danh duy nhất của chuyên khoa"]
+  ten string [note: "Tên hiển thị đầy đủ của chuyên khoa"]
+  code_chuyen_khoa string [note: "Mã viết tắt hoặc mã quản lý nghiệp vụ của chuyên khoa"]
+  active boolean [note: "Trạng thái hoạt động (True: Đang sử dụng, False: Tạm ngưng)"]
+  deleted int [note: "Flag (0: Chưa xóa, 1: Đã xóa)"]
+  created_at timestamp [note: "Thời điểm tạo bản ghi"]
+  updated_at timestamp [note: "Thời điểm cập nhật bản ghi gần nhất"]
+}
+
+// Table 14: dm_dich_vu
+Table dm_dich_vu [note: "Bảng danh mục dịch vụ kỹ thuật, cận lâm sàng và giá dịch vụ"] {
+  id int [pk, note: "Khóa chính: ID định danh duy nhất của dịch vụ"]
+  code_dichvu string [note: "Mã dịch vụ (Mã nghiệp vụ)"]
+  ten string [note: "Tên hiển thị đầy đủ của dịch vụ"]
+  don_vi_tinh_id float [note: "ID đơn vị tính của dịch vụ (Lần, Viên, Hộp...)"]
+  ds_nguon_khac_chi_tra string [note: "Danh sách các nguồn chi trả khác (lưu dạng chuỗi)"]
+  gia_bao_hiem string [note: "Đơn giá bảo hiểm y tế chi trả (Lưu dạng chuỗi - cần lưu ý khi tính toán)"]
+  gia_khong_bao_hiem float [note: "Đơn giá dịch vụ (Giá thu phí đối với đối tượng không BHYT)"]
+  khong_tinh_tien float [note: "Trạng thái hoặc giá trị quy định việc không tính tiền dịch vụ"]
+  loai_dich_vu int [note: "Mã phân loại dịch vụ (FK)"]
+  nhom_dich_vu_cap1_id int [note: "ID nhóm dịch vụ cấp 1 (Phân cấp quản lý dịch vụ) (FK)"]
+  nhom_dich_vu_cap2_id float [note: "ID nhóm dịch vụ cấp 2 (FK)"]
+  nhom_dich_vu_cap3_id float [note: "ID nhóm dịch vụ cấp 3 (FK)"]
+  ten_tuong_duong string [note: "Tên gọi khác hoặc tên tương đương của dịch vụ"]
+  thu_ngoai boolean [note: "Flag xác định dịch vụ thu phí ngoài/dịch vụ ngoài danh mục"]
+  ty_le_bh_tt int [note: "Tỷ lệ phần trăm bảo hiểm thanh toán"]
+  ty_le_tt_dv int [note: "Tỷ lệ phần trăm thanh toán theo giá dịch vụ"]
+  viet_tat string [note: "Tên hoặc mã viết tắt của dịch vụ"]
+  chi_dinh_sl_le boolean [note: "Cho phép chỉ định số lượng lẻ (số thập phân) hay không"]
+  nguon_khac_id string [note: "Mã tham chiếu đến hệ thống hoặc nguồn dữ liệu khác"]
+  gui_vitimes boolean [note: "Flag đánh dấu gửi dữ liệu sang hệ thống Vitimes"]
+  mien_phi_giam_doc_duyet boolean [note: "Flag xác định dịch vụ được miễn phí theo duyệt của Giám đốc"]
+  khong_su_dung boolean [note: "Flag đánh dấu ngừng sử dụng dịch vụ này"]
+  online_ boolean [note: "Flag cho phép hiển thị hoặc đăng ký qua kênh Online"]
+  sua_gia boolean [note: "Cho phép người dùng sửa giá khi chỉ định dịch vụ"]
+  active boolean [note: "Trạng thái hoạt động (True: Đang dùng, False: Tạm ngưng)"]
+  deleted int [note: "Flag (0: Chưa xóa, 1: Đã xóa)"]
+  created_at timestamp [note: "Thời điểm tạo bản ghi"]
+  updated_at timestamp [note: "Thời điểm cập nhật bản ghi gần nhất"]
+}
+
+Ref: dm_dich_vu.loai_dich_vu > dm_loai_dich_vu.id
+Ref: dm_dich_vu.nhom_dich_vu_cap1_id > dm_nhom_dich_vu_cap1.id
+Ref: dm_dich_vu.nhom_dich_vu_cap2_id > dm_nhom_dich_vu_cap2.id
+Ref: dm_dich_vu.nhom_dich_vu_cap3_id > dm_nhom_dich_vu_cap3.id
+
+// Table 15: dm_doi_tuong_kcb
+Table dm_doi_tuong_kcb [note: "Bảng danh mục phân loại đối tượng khám chữa bệnh (Ví dụ: nội trú, ngoại trú...)"] {
+  id int [pk, note: "Khóa chính: ID định danh đối tượng KCB"]
+  ten string [note: "Tên hiển thị của đối tượng (Ví dụ: Điều trị nội trú ban ngày,..."]
+  created_at timestamp [note: "Thời điểm tạo bản ghi"]
+  updated_at timestamp [note: "Thời điểm cập nhật bản ghi gần nhất"]
+}
+
+// Table 16: dm_dv_discount
+Table dm_dv_discount [note: "Bảng cấu hình chính sách giảm giá hoặc chiết khấu cho các dịch vụ"] {
+  id int [pk, note: "Khóa chính: ID định danh chính sách giảm giá"]
+  discount_percent float [note: "Tỷ lệ phần trăm giảm giá (áp dụng khi loại giảm giá là theo phần trăm)"]
+  loai_dich_vu_id string [note: "ID loại dịch vụ được áp dụng mã giảm giá này (lưu dạng chuỗi, có thể là danh sách ID) (FK)"]
+  type_discount int [note: "Loại hình giảm giá (Ví dụ: 1 = Theo phần trăm, 2 = Theo số tiền cố định)"]
+  fix_amount int [note: "Số tiền giảm cố định (áp dụng khi loại giảm giá là theo số tiền)"]
+  created_at timestamp [note: "Thời điểm tạo bản ghi"]
+  updated_at timestamp [note: "Thời điểm cập nhật bản ghi gần nhất"]
+}
+
+Ref: dm_dv_discount.loai_dich_vu_id > dm_loai_dich_vu.id
+
+// Table 17: dm_hoc_ham_hoc_vi
+Table dm_hoc_ham_hoc_vi [note: "Bảng danh mục học hàm và học vị (Ví dụ: Giáo sư, Tiến sĩ, Thạc sĩ, Bác sĩ CKII...)"] {
+  id int [pk, note: "Khóa chính: ID định danh duy nhất của học hàm/học vị"]
+  code_hoc_ham string [note: "Mã viết tắt của học hàm/học vị (Ví dụ: DR, PHD, ...)"]
+  ten string [note: "Tên hiển thị đầy đủ (Ví dụ: Doctor, Bachelor, Master, ...)"]
+  active boolean [note: "Trạng thái hoạt động (True: Đang sử dụng, False: Tạm ngưng)"]
+  deleted int [note: "Flag (0: Chưa xóa, 1: Đã xóa)"]
+  created_at timestamp [note: "Thời điểm tạo bản ghi"]
+  updated_at timestamp [note: "Thời điểm cập nhật bản ghi gần nhất"]
+}
+
+// Table 18: dm_hop_dong_ksk
+Table dm_hop_dong_ksk [note: "Bảng quản lý thông tin các hợp đồng khám sức khỏe đoàn/công ty"] {
+  id int [pk, note: "Khóa chính: ID định danh hợp đồng"]
+  code_hop_dong int [note: "Mã số quản lý nội bộ của hợp đồng"]
+  ten string [note: "Tên hiển thị của hợp đồng (Ví dụ: KSK Công ty ABC năm 2025)"]
+  ds_ma_giam_gia_id string [note: "Danh sách ID các mã giảm giá được áp dụng (lưu dạng chuỗi/mảng)"]
+  hinh_thuc_mien_giam float [note: "Mã định danh hình thức miễn giảm áp dụng"]
+  hinh_thuc_tt_dv_ngoai_hd float [note: "Quy định hình thức thanh toán cho các dịch vụ phát sinh ngoài hợp đồng"]
+  ngay_hieu_luc string [note: "Ngày bắt đầu có hiệu lực của hợp đồng"]
+  phan_tram_mien_giam float [note: "Tỷ lệ phần trăm giảm giá chung cho toàn bộ hợp đồng"]
+  so_hop_dong string [note: "Số hiệu văn bản hợp đồng pháp lý (Contract Number)"]
+  thoi_gian_thanh_ly string [note: "Thời gian thực hiện thanh lý hợp đồng"]
+  tien_chua_thanh_toan float [note: "Số tiền công nợ còn lại chưa thanh toán"]
+  tien_da_thanh_toan float [note: "Số tiền khách hàng đã thanh toán"]
+  tien_du_kien float [note: "Tổng doanh thu dự kiến ban đầu của hợp đồng"]
+  tien_du_kien_sau_giam float [note: "Tổng doanh thu dự kiến sau khi trừ các khoản giảm giá"]
+  tien_giam_gia float [note: "Tổng số tiền được giảm giá"]
+  tien_mien_giam_dich_vu float [note: "Số tiền miễn giảm được tính trên từng dịch vụ cụ thể"]
+  tien_mien_giam_hop_dong float [note: "Số tiền miễn giảm được tính trên tổng giá trị hợp đồng"]
+  tien_thuc_te float [note: "Tổng doanh thu thực tế phát sinh khi thực hiện hợp đồng"]
+  tien_thuc_te_sau_giam float [note: "Tổng doanh thu thực tế sau khi trừ giảm giá"]
+  trang_thai int [note: "Trạng thái quy trình của hợp đồng (Ví dụ: 0=Mới, 1=Đang thực hiện, 2=Đã thanh lý)"]
+  chot_thanh_toan_dv_ksk float [note: "Đánh dấu trạng thái đã chốt thanh toán các dịch vụ trong gói KSK"]
+  tien_nb_da_thanh_toan float [note: "Số tiền người bệnh đã tự thanh toán thêm"]
+  tien_tai_tro_nb float [note: "Số tiền được tài trợ cho người bệnh"]
+  nguoi_gioi_thieu_id float [note: "ID người giới thiệu hợp đồng này"]
+  nguon_nb_id float [note: "ID nguồn tiếp cận hợp đồng (Marketing source)"]
+  active boolean [note: "Trạng thái hoạt động (True: Đang hiệu lực, False: Tạm khóa)"]
+  deleted int [note: "Flag (0: Chưa xóa, 1: Đã xóa)"]
+  created_at timestamp [note: "Thời điểm tạo bản ghi"]
+  updated_at timestamp [note: "Thời điểm cập nhật bản ghi gần nhất"]
+}
+
+Ref: dm_hop_dong_ksk.nguoi_gioi_thieu_id > dm_nguoi_gioi_thieu.id
+Ref: dm_hop_dong_ksk.nguon_nb_id > dm_nguon_nb.id
+
+// Table 19: dm_khoa
+Table dm_khoa [note: "Bảng danh mục khoa/phòng ban trong cơ sở y tế"] {
+  id int [pk, note: "Khóa chính: ID định danh duy nhất của khoa"]
+  code_khoa string [note: "Mã viết tắt hoặc mã quản lý nghiệp vụ của khoa"]
+  ten string [note: "Tên hiển thị đầy đủ của khoa"]
+  active boolean [note: "Trạng thái hoạt động (True: Đang sử dụng, False: Tạm ngưng)"]
+  ds_tinh_chat_khoa string [note: "Danh sách tính chất của khoa (lưu dạng chuỗi/mảng)"]
+  deleted int [note: "Flag (0: Chưa xóa, 1: Đã xóa)"]
+  created_at timestamp [note: "Thời điểm tạo bản ghi"]
+  updated_at timestamp [note: "Thời điểm cập nhật bản ghi gần nhất"]
+}
+
+// Table 20: dm_loai_dich_vu
+Table dm_loai_dich_vu [note: "Bảng danh mục phân loại nhóm dịch vụ cấp cao (Ví dụ: Khám bệnh, Xét nghiệm, Chẩn đoán hình ảnh, Thuốc...)"] {
+  id int [pk, note: "Khóa chính: ID định danh loại dịch vụ"]
+  ten string [note: "Tên hiển thị loại dịch vụ"]
+  created_at timestamp [note: "Thời điểm tạo bản ghi"]
+  updated_at timestamp [note: "Thời điểm cập nhật bản ghi gần nhất"]
+}
+
+// Table 21: dm_nguoi_gioi_thieu
+Table dm_nguoi_gioi_thieu [note: "Bảng danh mục thông tin người giới thiệu (đối tác, cộng tác viên, nhân viên...)"] {
+  id int [pk, note: "Khóa chính: ID định danh duy nhất người giới thiệu"]
+  code_nguoi_gioi_thieu string [note: "Mã quản lý người giới thiệu"]
+  ten string [note: "Họ và tên hoặc tên tổ chức giới thiệu"]
+  ds_nguon_nb_id string [note: "Danh sách ID nguồn người bệnh mà người này phụ trách (lưu dạng chuỗi/mảng) (FK)"]
+  active boolean [note: "Trạng thái hoạt động (True: Đang hợp tác, False: Tạm ngưng)"]
+  deleted int [note: "Flag (0: Chưa xóa, 1: Đã xóa)"]
+  created_at timestamp [note: "Thời điểm tạo bản ghi"]
+  updated_at timestamp [note: "Thời điểm cập nhật bản ghi gần nhất"]
+}
+
+Ref: dm_nguoi_gioi_thieu.ds_nguon_nb_id > dm_nguon_nb.id
+
+// Table 22: dm_nguon_nb
+Table dm_nguon_nb [note: "Bảng danh mục nguồn người bệnh"]
+{
+  id int [pk, note: "Khóa chính: ID định danh nguồn người bệnh"]
+  code_nguon_nb string [note: "Mã quản lý nguồn người bệnh"]
+  ten string [note: "Tên hiển thị nguồn người bệnh"]
+  nguoi_gioi_thieu boolean [note: "Flag đánh dấu nguồn này có gắn liền với người giới thiệu cụ thể hay không"]
+  nhom_nguon int [note: "ID nhóm phân loại nguồn"]
+  active boolean [note: "Trạng thái hoạt động (True: Đang sử dụng, False: Tạm ngưng)"]
+  deleted int [note: "Flag (0: Chưa xóa, 1: Đã xóa)"]
+  created_at timestamp [note: "Thời điểm tạo bản ghi"]
+  updated_at timestamp [note: "Thời điểm cập nhật bản ghi gần nhất"]
+}
+
+// Table 23: dm_nhan_vien
+Table dm_nhan_vien [note: "Bảng danh mục nhân viên y tế và cán bộ công nhân viên trong hệ thống"] {
+  id int [pk, note: "Khóa chính: ID định danh duy nhất của nhân viên"]
+  code_nhan_vien string [note: "Mã nhân viên (Mã quản lý nhân sự/chấm công)"]
+  ten string [note: "Họ và tên đầy đủ của nhân viên"]
+  chung_chi string [note: "Số chứng chỉ hành nghề (đối với bác sĩ/điều dưỡng)"]
+  ds_chuyen_khoa_id string [note: "Danh sách ID các chuyên khoa mà nhân viên này thuộc về (lưu dạng chuỗi/mảng)"]
+  email string [note: "Địa chỉ thư điện tử liên hệ"]
+  gioi_tinh string [note: "Giới tính"]
+  hoc_ham_hoc_vi_id int [note: "ID học hàm/học vị (Liên kết với bảng dm_hoc_ham_hoc_vi)"]
+  ngay_sinh string [note: "Ngày tháng năm sinh (lưu dưới dạng chuỗi)"]
+  van_bang_id int [note: "ID văn bằng chuyên môn cao nhất"]
+  active boolean [note: "Trạng thái hoạt động (True: Đang làm việc, False: Đã nghỉ việc/Tạm ngưng)"]
+  deleted int [note: "Flag (0: Chưa xóa, 1: Đã xóa)"]
+  created_at timestamp [note: "Thời điểm tạo hồ sơ nhân viên"]
+  updated_at timestamp [note: "Thời điểm cập nhật hồ sơ gần nhất"]
+}
+
+Ref: dm_nhan_vien.ds_chuyen_khoa_id > dm_chuyen_khoa.id
+Ref: dm_nhan_vien.hoc_ham_hoc_vi_id > dm_hoc_ham_hoc_vi.id
+
+// Table 24: dm_nhom_dich_vu_cap1
+Table dm_nhom_dich_vu_cap1 [note: "Bảng danh mục nhóm dịch vụ cấp 1 (Nhóm cha cao nhất trong phân cấp dịch vụ kỹ thuật)"] {
+  id int [pk, note: "Khóa chính: ID định danh nhóm dịch vụ cấp 1"]
+  code_service_lvl_1 string [note: "Mã định danh nghiệp vụ của nhóm cấp 1"]
+  ten string [note: "Tên hiển thị nhóm dịch vụ"]
+  loai_dich_vu float [note: "ID loại dịch vụ tương ứng (Liên kết với dm_loai_dich_vu)"]
+  stt_bang_ke int [note: "Số thứ tự ưu tiên khi hiển thị trên bảng kê chi phí"]
+  trang_thai_hoan_thanh float [note: "Trạng thái quy định điều kiện hoàn thành của nhóm dịch vụ này"]
+  trang_thai_lay_stt float [note: "Cấu hình trạng thái liên quan đến việc lấy số thứ tự (QMS)"]
+  active boolean [note: "Trạng thái hoạt động (True: Đang sử dụng, False: Tạm ngưng)"]
+  deleted int [note: "Flag (0: Chưa xóa, 1: Đã xóa)"]
+  created_at timestamp [note: "Thời điểm tạo bản ghi"]
+  updated_at timestamp [note: "Thời điểm cập nhật bản ghi gần nhất"]
+}
+
+Ref: dm_nhom_dich_vu_cap1.loai_dich_vu > dm_loai_dich_vu.id
 
 
+// Table 25: dm_nhom_dich_vu_cap2
+Table dm_nhom_dich_vu_cap2 [note: "Bảng danh mục nhóm dịch vụ cấp 2 (Phân nhóm con của cấp 1, ví dụ: X-Quang, Siêu âm thuộc CĐHA)"] {
+  id int [pk, note: "Khóa chính: ID định danh nhóm dịch vụ cấp 2"]
+  code_service_lvl_2 string [note: "Mã định danh nghiệp vụ của nhóm cấp 2"]
+  ten string [note: "Tên hiển thị nhóm dịch vụ cấp 2"]
+  luu_phim_chup boolean [note: "Cấu hình yêu cầu lưu trữ phim/hình ảnh (thường dùng cho Chẩn đoán hình ảnh)"]
+  nhom_dich_vu_cap1_id int [note: "ID nhóm dịch vụ cấp 1 cha (Liên kết với bảng dm_nhom_dich_vu_cap1)"]
+  phieu_chi_dinh_id float [note: "ID mẫu phiếu chỉ định mặc định áp dụng cho nhóm này"]
+  tach_stt_noi_tru boolean [note: "Cấu hình tách riêng luồng số thứ tự cho bệnh nhân nội trú"]
+  tach_stt_uu_tien boolean [note: "Cấu hình tách riêng luồng số thứ tự cho đối tượng ưu tiên"]
+  theo_yeu_cau boolean [note: "Đánh dấu nhóm dịch vụ này thuộc loại hình Theo yêu cầu"]
+  tiep_don_cls boolean [note: "Cho phép thực hiện quy trình tiếp đón ngay tại khu vực Cận lâm sàng"]
+  trang_thai_hoan_thanh float [note: "Trạng thái quy định điều kiện hoàn thành của nhóm dịch vụ"]
+  trang_thai_lay_stt float [note: "Cấu hình trạng thái liên quan đến quy trình lấy số thứ tự"]
+  active boolean [note: "Trạng thái hoạt động (True: Đang sử dụng, False: Tạm ngưng)"]
+  deleted int [note: "Flag (0: Chưa xóa, 1: Đã xóa)"]
+  created_at timestamp [note: "Thời điểm tạo bản ghi"]
+  updated_at timestamp [note: "Thời điểm cập nhật bản ghi gần nhất"]
+}
+
+Ref: dm_nhom_dich_vu_cap2.nhom_dich_vu_cap1_id > dm_nhom_dich_vu_cap1.id
+
+// Table 26: dm_nhom_dich_vu_cap3
+Table dm_nhom_dich_vu_cap3 [note: "Bảng danh mục nhóm dịch vụ cấp 3 (Cấp chi tiết nhất trong phân cấp dịch vụ, trực thuộc nhóm cấp 2)"] {
+  id int [pk, note: "Khóa chính: ID định danh nhóm dịch vụ cấp 3"]
+  code_service_lvl_3 string [note: "Mã định danh nghiệp vụ của nhóm cấp 3"]
+  ten string [note: "Tên hiển thị nhóm dịch vụ cấp 3"]
+  nhom_dich_vu_cap2_id int [note: "ID nhóm dịch vụ cấp 2 cha (Liên kết với bảng dm_nhom_dich_vu_cap2)"]
+  active boolean [note: "Trạng thái hoạt động (True: Đang sử dụng, False: Tạm ngưng)"]
+  deleted int [note: "Flag (0: Chưa xóa, 1: Đã xóa)"]
+  created_at timestamp [note: "Thời điểm tạo bản ghi"]
+  updated_at timestamp [note: "Thời điểm cập nhật bản ghi gần nhất"]
+}
+
+Ref: dm_nhom_dich_vu_cap3.nhom_dich_vu_cap2_id > dm_nhom_dich_vu_cap2.id
+
+// Table 27: dm_phong
+Table dm_phong [note: "Bảng danh mục buồng/phòng (Phòng khám, phòng bệnh, phòng chức năng...)"] {
+  id int [pk, note: "Khóa chính: ID định danh duy nhất của phòng"]
+  code_phong string [note: "Mã phòng (Mã định danh nghiệp vụ dùng để quản lý/tìm kiếm)"]
+  ten string [note: "Tên hiển thị đầy đủ của phòng"]
+  chuyen_khoa_id float [note: "ID chuyên khoa gắn với phòng này (nếu phòng thuộc chuyên khoa cụ thể)"]
+  dia_diem string [note: "Vị trí vật lý của phòng (Tầng, Khu vực, Tòa nhà...)"]
+  ds_loai_phong string [note: "Danh sách phân loại chức năng của phòng (Lâm sàng, Cận lâm sàng, Hành chính... lưu dạng chuỗi)"]
+  khoa_id int [note: "ID Khoa quản lý trực tiếp phòng này (Liên kết bảng dm_khoa)"]
+  ngoai_tru boolean [note: "Flag xác định phòng có phục vụ khám chữa bệnh Ngoại trú"]
+  ngoai_vien boolean [note: "Flag xác định phòng thuộc khu vực hoặc chức năng Ngoại viện"]
+  noi_tru boolean [note: "Flag xác định phòng có phục vụ bệnh nhân Nội trú (Buồng bệnh)"]
+  online boolean [note: "Flag xác định phòng dùng cho tư vấn/khám Online"]
+  active boolean [note: "Trạng thái hoạt động (True: Đang sử dụng, False: Tạm ngưng)"]
+  deleted int [note: "Flag (0: Chưa xóa, 1: Đã xóa)"]
+  created_at timestamp [note: "Thời điểm tạo bản ghi"]
+  updated_at timestamp [note: "Thời điểm cập nhật bản ghi gần nhất"]
+}
+
+Ref: dm_phong.chuyen_khoa_id > dm_chuyen_khoa.id
+Ref: dm_phong.khoa_id > dm_khoa.id
+
+// Table 28: dm_quan_huyen
+Table dm_quan_huyen [note: "Bảng danh mục Quận/Huyện (Đơn vị hành chính cấp 2)"] {
+  id int [pk, note: "Khóa chính: ID định danh duy nhất của quận/huyện"]
+  ten string [note: "Tên hiển thị của quận/huyện (Ví dụ: Quận 1, Huyện Củ Chi...)"]
+  code_quan_huyen int [note: "Mã nội bộ quản lý quận/huyện"]
+  ma_tcqg int [note: "Mã hành chính theo tiêu chuẩn quốc gia (Dùng cho báo cáo thống kê/BHYT)"]
+  tinh_thanh_pho_id int [note: "ID Tỉnh/Thành phố trực thuộc (Liên kết với bảng dm_tinh_thanh_pho)"]
+  active boolean [note: "Trạng thái hoạt động (True: Đang sử dụng, False: Tạm ngưng)"]
+  deleted int [note: "Flag (0: Chưa xóa, 1: Đã xóa)"]
+  created_at timestamp [note: "Thời điểm tạo bản ghi"]
+  updated_at timestamp [note: "Thời điểm cập nhật bản ghi gần nhất"]
+}
+
+Ref: dm_quan_huyen.tinh_thanh_pho_id > dm_tinh_thanh_pho.id
+
+// Table 29: dm_tinh_thanh_pho
+Table dm_tinh_thanh_pho [note: "Bảng danh mục Tỉnh/Thành phố (Đơn vị hành chính cấp 1)"] {
+  id int [pk, note: "Khóa chính: ID định danh duy nhất của tỉnh/thành phố"]
+  code_province int [note: "Mã nội bộ quản lý tỉnh/thành phố"]
+  ten string [note: "Tên hiển thị của tỉnh/thành phố (Ví dụ: Hà Nội, TP. Hồ Chí Minh...)"]
+  ma_tcqg int [note: "Mã hành chính theo tiêu chuẩn quốc gia (Dùng cho báo cáo thống kê/BHYT)"]
+  active boolean [note: "Trạng thái hoạt động (True: Đang sử dụng, False: Tạm ngưng)"]
+  deleted int [note: "Flag (0: Chưa xóa, 1: Đã xóa)"]
+  created_at timestamp [note: "Thời điểm tạo bản ghi"]
+  updated_at timestamp [note: "Thời điểm cập nhật bản ghi gần nhất"]
+}
 
 
+// Table 30: dm_xa_phuong
+Table dm_xa_phuong [note: "Bảng danh mục Xã/Phường (Đơn vị hành chính cấp 3)"] {
+  xa_phuong_id int [pk, note: "Khóa chính: ID định danh duy nhất của xã/phường"]
+  ten_xa_phuong string [note: "Tên hiển thị của xã/phường"]
+  quan_huyen_id int [note: "ID Quận/Huyện trực thuộc (Liên kết với bảng dm_quan_huyen)"]
+}
 
+Ref: dm_xa_phuong.quan_huyen_id > dm_quan_huyen.id
+
+// Table 31: hospital_configs
+Table hospital_configs [note: "Bảng lưu trữ cấu hình hệ thống, tham số tùy chỉnh cho các bảng và cột dữ liệu"] {
+  id int [pk, note: "Khóa chính: ID định danh cấu hình"]
+  table_name string [note: "Tên bảng dữ liệu mà cấu hình này áp dụng (Scope: Table)"]
+  column_name string [note: "Tên cột cụ thể trong bảng (nếu cấu hình chi tiết theo cột - Scope: Column)"]
+  value_code string [note: "Giá trị cài đặt, tham số hoặc mã định danh của cấu hình"]
+  description string [note: "Mô tả chi tiết ý nghĩa và tác dụng của cấu hình này"]
+  created_at timestamp [note: "Thời điểm tạo bản ghi"]
+  updated_at timestamp [note: "Thời điểm cập nhật bản ghi gần nhất"]
+}
 
