@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_Billing_V2" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.16.0" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.20.0">
+  <bpmn:collaboration id="Collaboration_Billing">
+    <bpmn:participant id="Participant_Billing" name="Hospital Billing &amp; Payment Process (Updated Data)" processRef="Process_Billing_Payment" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Billing_Payment" isExecutable="true">
+    <bpmn:laneSet id="LaneSet_Billing">
+      <bpmn:lane id="Lane_System" name="HIS System (Auto-Calculation)">
+        <bpmn:flowNodeRef>Task_CalculateInsurance</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ApplyDiscount</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Cashier" name="Cashier">
+        <bpmn:flowNodeRef>StartEvent_PaymentRequest</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_PaymentType</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CreateDeposit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_FinalSettlement</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_PrintReceipt</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_PaymentDone</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    
+    <bpmn:startEvent id="StartEvent_PaymentRequest" name="Payment Request Triggered">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    
+    <bpmn:exclusiveGateway id="Gateway_PaymentType" name="Payment Type?">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_Deposit</bpmn:outgoing>
+      <bpmn:outgoing>Flow_To_Settlement</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_PaymentRequest" targetRef="Gateway_PaymentType" />
+    
+    <bpmn:userTask id="Task_CreateDeposit" name="Create Deposit (Tạm ứng)">
+      <bpmn:documentation>RELATED TABLES:
+1. ct_phieu_thu: Create record with 'loai_phieu_thu' = 1 (Tạm ứng).
+2. ct_dot_dieu_tri: Link receipt to current visit ID.
+3. Note: 'trang_thai_hoa_don' = 10 (Paid).</bpmn:documentation>
+      <bpmn:incoming>Flow_To_Deposit</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_Print</bpmn:outgoing>
+    </bpmn:userTask>
+    
+    <bpmn:task id="Task_CalculateInsurance" name="Calculate Insurance Coverage">
+      <bpmn:documentation>RELATED TABLES:
+1. ct_dich_vu: Read 'don_gia'.
+2. ct_dot_dieu_tri: Check 'doi_tuong' (1=Service, 2=BHYT).
+3. Logic: Update 'tien_bh_thanh_toan' based on policy.</bpmn:documentation>
+      <bpmn:incoming>Flow_To_Settlement</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:task>
+    
+    <bpmn:task id="Task_ApplyDiscount" name="Apply Discounts/Vouchers">
+      <bpmn:documentation>RELATED TABLES:
+1. dm_dv_discount: Lookup active promotions.
+2. ct_dich_vu: Update 'tien_giam_gia' if applicable.</bpmn:documentation>
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:task>
+    
+    <bpmn:userTask id="Task_FinalSettlement" name="Final Settlement (Quyết toán)">
+      <bpmn:documentation>RELATED TABLES:
+1. ct_dich_vu: Sum(total cost) - Sum(deposits).
+2. ct_phieu_thu: Create record with 'loai_phieu_thu' = 0 (Thu phí/Quyết toán).
+3. ct_dich_vu: Update 'trang_thai_thanh_toan' = TRUE.</bpmn:documentation>
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_Print</bpmn:outgoing>
+    </bpmn:userTask>
+    
+    <bpmn:sequenceFlow id="Flow_To_Deposit" name="Advance/Deposit" sourceRef="Gateway_PaymentType" targetRef="Task_CreateDeposit" />
+    <bpmn:sequenceFlow id="Flow_To_Settlement" name="Final Payment" sourceRef="Gateway_PaymentType" targetRef="Task_CalculateInsurance" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_CalculateInsurance" targetRef="Task_ApplyDiscount" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_ApplyDiscount" targetRef="Task_FinalSettlement" />
+    
+    <bpmn:userTask id="Task_PrintReceipt" name="Collect Money &amp; Print Receipt">
+      <bpmn:documentation>RELATED TABLES:
+1. ct_phieu_thu: Update 'thoi_gian_thanh_toan', 'nguoi_thu_id'.
+2. ct_phieu_thu: Ensure 'trang_thai_hoa_don' = 10 (Completed).
+3. Data fields: 'ky_hieu' (e.g., Westmead/24), 'so_phieu'.</bpmn:documentation>
+      <bpmn:incoming>Flow_To_Print</bpmn:incoming>
+      <bpmn:incoming>Flow_Deposit_Done</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+    </bpmn:userTask>
+    
+    <bpmn:sequenceFlow id="Flow_To_Print" sourceRef="Task_FinalSettlement" targetRef="Task_PrintReceipt" />
+    <bpmn:sequenceFlow id="Flow_Deposit_Done" sourceRef="Task_CreateDeposit" targetRef="Task_PrintReceipt" />
+    
+    <bpmn:endEvent id="EndEvent_PaymentDone" name="Transaction Completed">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_PrintReceipt" targetRef="EndEvent_PaymentDone" />
+    
+  </bpmn:process>
+  
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Billing">
+    <bpmndi:BPMNPlane id="BPMNPlane_Billing" bpmnElement="Collaboration_Billing">
+      <bpmndi:BPMNShape id="Participant_Billing_di" bpmnElement="Participant_Billing" isHorizontal="true">
+        <dc:Bounds x="129" y="80" width="1000" height="400" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_System_di" bpmnElement="Lane_System" isHorizontal="true">
+        <dc:Bounds x="159" y="80" width="970" height="150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Cashier_di" bpmnElement="Lane_Cashier" isHorizontal="true">
+        <dc:Bounds x="159" y="230" width="970" height="250" />
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape id="StartEvent_di" bpmnElement="StartEvent_PaymentRequest">
+        <dc:Bounds x="200" y="322" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="176" y="365" width="87" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape id="Gateway_di" bpmnElement="Gateway_PaymentType" isMarkerVisible="true">
+        <dc:Bounds x="295" y="315" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="282" y="372" width="77" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape id="Task_Deposit_di" bpmnElement="Task_CreateDeposit">
+        <dc:Bounds x="420" y="380" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape id="Task_CalcIns_di" bpmnElement="Task_CalculateInsurance">
+        <dc:Bounds x="420" y="110" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape id="Task_Disc_di" bpmnElement="Task_ApplyDiscount">
+        <dc:Bounds x="580" y="110" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape id="Task_Settlement_di" bpmnElement="Task_FinalSettlement">
+        <dc:Bounds x="580" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape id="Task_Print_di" bpmnElement="Task_PrintReceipt">
+        <dc:Bounds x="780" y="300" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape id="EndEvent_di" bpmnElement="EndEvent_PaymentDone">
+        <dc:Bounds x="952" y="322" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="942" y="365" width="58" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="236" y="340" />
+        <di:waypoint x="295" y="340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Dep_di" bpmnElement="Flow_To_Deposit">
+        <di:waypoint x="320" y="365" />
+        <di:waypoint x="320" y="420" />
+        <di:waypoint x="420" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Set_di" bpmnElement="Flow_To_Settlement">
+        <di:waypoint x="320" y="315" />
+        <di:waypoint x="320" y="150" />
+        <di:waypoint x="420" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="520" y="150" />
+        <di:waypoint x="580" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <di:waypoint x="630" y="190" />
+        <di:waypoint x="630" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ToPrint_di" bpmnElement="Flow_To_Print">
+        <di:waypoint x="680" y="280" />
+        <di:waypoint x="730" y="280" />
+        <di:waypoint x="730" y="320" />
+        <di:waypoint x="780" y="320" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_DepDone_di" bpmnElement="Flow_Deposit_Done">
+        <di:waypoint x="520" y="420" />
+        <di:waypoint x="730" y="420" />
+        <di:waypoint x="730" y="360" />
+        <di:waypoint x="780" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <di:waypoint x="880" y="340" />
+        <di:waypoint x="952" y="340" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

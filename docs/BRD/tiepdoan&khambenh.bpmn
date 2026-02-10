@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_HospitalProject" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.16.0" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.20.0">
+  <bpmn:collaboration id="Collaboration_HospitalMain">
+    <bpmn:participant id="Participant_Hospital" name="Hospital Core Process" processRef="Process_Hospital_Unified" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Hospital_Unified" isExecutable="true">
+    <bpmn:laneSet id="LaneSet_Roles">
+      <bpmn:lane id="Lane_Receptionist" name="Receptionist / Admin">
+        <bpmn:flowNodeRef>StartEvent_PatientArrives</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RegisterPatient</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_AssignQueue</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Doctor" name="Doctor / Physician">
+        <bpmn:flowNodeRef>Task_ClinicalExam</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_NeedsServices</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_OrderServices</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_FinalConclusion</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Technician" name="Technician (Lab/X-Ray)">
+        <bpmn:flowNodeRef>Task_ExecuteService</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Cashier" name="Cashier / Finance">
+        <bpmn:flowNodeRef>Task_ProcessPayment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_PatientDischarged</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="StartEvent_PatientArrives" name="Patient Arrives">
+      <bpmn:outgoing>Flow_To_Register</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="Task_RegisterPatient" name="Register Patient &amp; Create Visit">
+      <bpmn:documentation>RELATED TABLES:
+1. dm_benh_nhan: Lookup existing patient or create new permanent patient ID.
+2. ct_dot_dieu_tri: [CRITICAL] Create new visit session ID (start time, insurance status).
+3. ct_address: Update current contact address for this visit.</bpmn:documentation>
+      <bpmn:incoming>Flow_To_Register</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_Assign</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_To_Register" sourceRef="StartEvent_PatientArrives" targetRef="Task_RegisterPatient" />
+    <bpmn:userTask id="Task_AssignQueue" name="Assign to Clinic Queue">
+      <bpmn:documentation>RELATED TABLES:
+1. ct_dv_kham: Create initial clinical service record (queuing for specific clinic/doctor).</bpmn:documentation>
+      <bpmn:incoming>Flow_To_Assign</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_Exam</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_To_Assign" sourceRef="Task_RegisterPatient" targetRef="Task_AssignQueue" />
+    <bpmn:sequenceFlow id="Flow_To_Exam" sourceRef="Task_AssignQueue" targetRef="Task_ClinicalExam" />
+    <bpmn:userTask id="Task_ClinicalExam" name="Perform Clinical Examination">
+      <bpmn:documentation>RELATED TABLES:
+1. ct_dv_kham: Update record with actual doctor ID, start time, and preliminary clinical notes.</bpmn:documentation>
+      <bpmn:incoming>Flow_To_Exam</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_Gateway</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="Gateway_NeedsServices" name="Needs Services (Labs/Imaging)?">
+      <bpmn:incoming>Flow_To_Gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_NoServices</bpmn:outgoing>
+      <bpmn:outgoing>Flow_YesServices</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="Flow_To_Gateway" sourceRef="Task_ClinicalExam" targetRef="Gateway_NeedsServices" />
+    <bpmn:sequenceFlow id="Flow_NoServices" name="No" sourceRef="Gateway_NeedsServices" targetRef="Task_FinalConclusion" />
+    <bpmn:userTask id="Task_OrderServices" name="Order Services (CLS)">
+      <bpmn:documentation>RELATED TABLES:
+1. ct_bo_chi_dinh: Create header for service order form.
+2. ct_dich_vu: Insert individual service line items with prices (linking back to order form).</bpmn:documentation>
+      <bpmn:incoming>Flow_YesServices</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_Execution</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_YesServices" name="Yes" sourceRef="Gateway_NeedsServices" targetRef="Task_OrderServices" />
+    <bpmn:sequenceFlow id="Flow_To_Execution" sourceRef="Task_OrderServices" targetRef="Task_ExecuteService" />
+    <bpmn:userTask id="Task_ExecuteService" name="Execute Service &amp; Input Results">
+      <bpmn:documentation>RELATED TABLES:
+1. ct_dv_ky_thuat: Record technical execution details (performer ID, room ID, timestamps, execution status).
+(Note: Financial status remains in ct_dich_vu).</bpmn:documentation>
+      <bpmn:incoming>Flow_To_Execution</bpmn:incoming>
+      <bpmn:outgoing>Flow_Results_To_Conclusion</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_Results_To_Conclusion" sourceRef="Task_ExecuteService" targetRef="Task_FinalConclusion" />
+    <bpmn:userTask id="Task_FinalConclusion" name="Final Conclusion &amp; Treatment Plan">
+      <bpmn:documentation>RELATED TABLES:
+1. ct_dv_kham_ket_luan: Record final diagnosis (ICD), treatment direction (discharge/admit), and advice.
+2. ct_dot_dieu_tri: Update medical end time.</bpmn:documentation>
+      <bpmn:incoming>Flow_NoServices</bpmn:incoming>
+      <bpmn:incoming>Flow_Results_To_Conclusion</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_Payment</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:sequenceFlow id="Flow_To_Payment" sourceRef="Task_FinalConclusion" targetRef="Task_ProcessPayment" />
+    <bpmn:userTask id="Task_ProcessPayment" name="Process Payment / Checkout">
+      <bpmn:documentation>RELATED TABLES:
+1. ct_dich_vu: Read outstanding costs, apply insurance/discounts logic, update payment status on lines.
+2. ct_phieu_thu: Create financial receipt record for collected amount.
+3. ct_dot_dieu_tri: Close financial status of the visit.</bpmn:documentation>
+      <bpmn:incoming>Flow_To_Payment</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_End</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="EndEvent_PatientDischarged" name="Patient Discharged">
+      <bpmn:incoming>Flow_To_End</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_To_End" sourceRef="Task_ProcessPayment" targetRef="EndEvent_PatientDischarged" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_HospitalMain">
+      <bpmndi:BPMNShape id="Participant_Hospital_di" bpmnElement="Participant_Hospital" isHorizontal="true">
+        <dc:Bounds x="129" y="80" width="1081" height="610" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Receptionist_di" bpmnElement="Lane_Receptionist" isHorizontal="true">
+        <dc:Bounds x="159" y="80" width="1051" height="150" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Doctor_di" bpmnElement="Lane_Doctor" isHorizontal="true">
+        <dc:Bounds x="159" y="230" width="1051" height="220" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Technician_di" bpmnElement="Lane_Technician" isHorizontal="true">
+        <dc:Bounds x="159" y="450" width="1051" height="120" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Cashier_di" bpmnElement="Lane_Cashier" isHorizontal="true">
+        <dc:Bounds x="159" y="570" width="1051" height="120" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="StartEvent_PatientArrives">
+        <dc:Bounds x="202" y="132" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="185" y="175" width="71" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1snl61m_di" bpmnElement="Task_RegisterPatient">
+        <dc:Bounds x="290" y="110" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0qqvqmk_di" bpmnElement="Task_AssignQueue">
+        <dc:Bounds x="450" y="110" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_0bb3l9n_di" bpmnElement="Task_ClinicalExam">
+        <dc:Bounds x="520" y="290" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_0k6x8s2_di" bpmnElement="Gateway_NeedsServices" isMarkerVisible="true">
+        <dc:Bounds x="665" y="305" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="651" y="276" width="79" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_10w4l5o_di" bpmnElement="Task_OrderServices">
+        <dc:Bounds x="770" y="350" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_1j9g1r6_di" bpmnElement="Task_ExecuteService">
+        <dc:Bounds x="830" y="470" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_193m43m_di" bpmnElement="Task_FinalConclusion">
+        <dc:Bounds x="970" y="290" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_116l4g6_di" bpmnElement="Task_ProcessPayment">
+        <dc:Bounds x="1030" y="590" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_1c56m0a_di" bpmnElement="EndEvent_PatientDischarged">
+        <dc:Bounds x="1172" y="612" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1162" y="655" width="56" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1n8w27x_di" bpmnElement="Flow_To_Register">
+        <di:waypoint x="238" y="150" />
+        <di:waypoint x="290" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_00u2p0z_di" bpmnElement="Flow_To_Assign">
+        <di:waypoint x="390" y="150" />
+        <di:waypoint x="450" y="150" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0a86h0p_di" bpmnElement="Flow_To_Exam">
+        <di:waypoint x="500" y="190" />
+        <di:waypoint x="500" y="240" />
+        <di:waypoint x="540" y="240" />
+        <di:waypoint x="540" y="290" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0x7k0j0_di" bpmnElement="Flow_To_Gateway">
+        <di:waypoint x="620" y="330" />
+        <di:waypoint x="665" y="330" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0v81v2w_di" bpmnElement="Flow_NoServices">
+        <di:waypoint x="715" y="330" />
+        <di:waypoint x="970" y="330" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="752" y="312" width="15" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1a50c0g_di" bpmnElement="Flow_YesServices">
+        <di:waypoint x="690" y="355" />
+        <di:waypoint x="690" y="390" />
+        <di:waypoint x="770" y="390" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="701" y="363" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0482p7z_di" bpmnElement="Flow_To_Execution">
+        <di:waypoint x="820" y="430" />
+        <di:waypoint x="820" y="450" />
+        <di:waypoint x="880" y="450" />
+        <di:waypoint x="880" y="470" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_03d083e_di" bpmnElement="Flow_Results_To_Conclusion">
+        <di:waypoint x="930" y="510" />
+        <di:waypoint x="1020" y="510" />
+        <di:waypoint x="1020" y="370" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_1f50c0g_di" bpmnElement="Flow_To_Payment">
+        <di:waypoint x="1070" y="330" />
+        <di:waypoint x="1080" y="330" />
+        <di:waypoint x="1080" y="590" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_0982p7z_di" bpmnElement="Flow_To_End">
+        <di:waypoint x="1130" y="630" />
+        <di:waypoint x="1172" y="630" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
