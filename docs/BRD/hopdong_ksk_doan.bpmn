@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_CorporateCheckup" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.16.0" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.20.0">
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_CorpCheckup_Final" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.16.0" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.20.0">
   <bpmn:collaboration id="Collaboration_CorpCheckup">
-    <bpmn:participant id="Participant_CorpCheckup" name="Corporate Health Checkup Contract Process" processRef="Process_CorpCheckup" />
+    <bpmn:participant id="Participant_CorpCheckup" name="Corporate Health Checkup Process (Full)" processRef="Process_CorpCheckup_V3" />
   </bpmn:collaboration>
-  <bpmn:process id="Process_CorpCheckup" isExecutable="true">
+  <bpmn:process id="Process_CorpCheckup_V3" isExecutable="true">
     <bpmn:laneSet id="LaneSet_CorpRoles">
       <bpmn:lane id="Lane_Sales" name="Sales / Contract Manager">
         <bpmn:flowNodeRef>StartEvent_ContractRequest</bpmn:flowNodeRef>
@@ -12,119 +12,181 @@
       </bpmn:lane>
       <bpmn:lane id="Lane_Admin" name="Reception / Admin">
         <bpmn:flowNodeRef>Task_ImportEmployeeList</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SearchEmployee</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_EmployeeFound</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RegisterNewEmployee</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_CheckinEmployee</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_Medical" name="Medical Staff (Doctors/Labs)">
-        <bpmn:flowNodeRef>Task_PerformCheckupServices</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_PerformPackageServices</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_DoctorConsult</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_ExtraService</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_OrderExtraService</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_PersonalPayment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_PerformExtraService</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_UpdateCheckupStatus</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_Finance" name="Finance / Accounting">
+        <bpmn:flowNodeRef>Task_ReconcileCosts</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_FinalizeContract</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>EndEvent_ContractClosed</bpmn:flowNodeRef>
       </bpmn:lane>
     </bpmn:laneSet>
-    
+
     <bpmn:startEvent id="StartEvent_ContractRequest" name="Company Requests Checkup">
-      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Start_To_Create</bpmn:outgoing>
     </bpmn:startEvent>
-    
-    <bpmn:userTask id="Task_CreateContract" name="Create Health Contract">
-      <bpmn:documentation>RELATED TABLES:
-1. dm_hop_dong_ksk: Create new contract record (contract number, company name, value, valid dates).
-2. dm_nguon_nb: Link to marketing source or referral if applicable.</bpmn:documentation>
-      <bpmn:incoming>Flow_1</bpmn:incoming>
-      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+
+    <bpmn:userTask id="Task_CreateContract" name="Create Contract (dm_hop_dong_ksk)">
+      <bpmn:documentation>Create header: dm_hop_dong_ksk. Link dm_nguon_nb (Source).</bpmn:documentation>
+      <bpmn:incoming>Flow_Start_To_Create</bpmn:incoming>
+      <bpmn:outgoing>Flow_Create_To_Define</bpmn:outgoing>
     </bpmn:userTask>
-    
-    <bpmn:userTask id="Task_DefinePackages" name="Define Service Packages">
-      <bpmn:documentation>RELATED TABLES:
-1. dm_bo_chi_dinh: Create specific service bundles (Combo) for this contract.
-2. dm_hop_dong_ksk: Update 'ds_ma_giam_gia_id' or discount rules for the package.</bpmn:documentation>
-      <bpmn:incoming>Flow_2</bpmn:incoming>
-      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+
+    <bpmn:userTask id="Task_DefinePackages" name="Define Packages (dm_bo_chi_dinh)">
+      <bpmn:documentation>Create Service Combos: dm_bo_chi_dinh. Link services to contract price rules.</bpmn:documentation>
+      <bpmn:incoming>Flow_Create_To_Define</bpmn:incoming>
+      <bpmn:outgoing>Flow_Define_To_Import</bpmn:outgoing>
     </bpmn:userTask>
-    
-    <bpmn:userTask id="Task_ImportEmployeeList" name="Import Employee List">
-      <bpmn:documentation>RELATED TABLES:
-1. dm_benh_nhan: Create or map patient profiles for each employee.
-2. ct_kham_suc_khoe: Create checkup records linked to 'hop_dong_ksk_id'.</bpmn:documentation>
-      <bpmn:incoming>Flow_3</bpmn:incoming>
-      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+
+    <bpmn:userTask id="Task_ImportEmployeeList" name="Import List (ct_kham_suc_khoe)">
+      <bpmn:documentation>Bulk insert employees. Map to dm_benh_nhan if exists.</bpmn:documentation>
+      <bpmn:incoming>Flow_Define_To_Import</bpmn:incoming>
+      <bpmn:outgoing>Flow_Import_To_Search</bpmn:outgoing>
     </bpmn:userTask>
-    
-    <bpmn:userTask id="Task_CheckinEmployee" name="Employee Check-in">
-      <bpmn:documentation>RELATED TABLES:
-1. ct_dot_dieu_tri: Create visit session for the employee.
-2. ct_kham_suc_khoe: Update 'thoi_gian_bat_dau' (start time) and link to the visit.</bpmn:documentation>
-      <bpmn:incoming>Flow_4</bpmn:incoming>
-      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+
+    <bpmn:userTask id="Task_SearchEmployee" name="Verify Employee (ct_kham_suc_khoe)">
+      <bpmn:documentation>Search in uploaded list when employee arrives.</bpmn:documentation>
+      <bpmn:incoming>Flow_Import_To_Search</bpmn:incoming>
+      <bpmn:outgoing>Flow_Search_To_Gateway</bpmn:outgoing>
     </bpmn:userTask>
-    
-    <bpmn:userTask id="Task_PerformCheckupServices" name="Perform Assigned Services">
-      <bpmn:documentation>RELATED TABLES:
-1. ct_dich_vu: Services are generated automatically from the contract package.
-2. ct_dv_ky_thuat: Technicians execute labs/X-rays.
-3. ct_dv_kham: Doctors perform general exams.</bpmn:documentation>
-      <bpmn:incoming>Flow_5</bpmn:incoming>
-      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+
+    <bpmn:exclusiveGateway id="Gateway_EmployeeFound" name="In List?">
+      <bpmn:incoming>Flow_Search_To_Gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Found_Yes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Found_No</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="Task_RegisterNewEmployee" name="Add Employee (ct_kham_suc_khoe)">
+      <bpmn:documentation>For new hires/substitutes not in original list.</bpmn:documentation>
+      <bpmn:incoming>Flow_Found_No</bpmn:incoming>
+      <bpmn:outgoing>Flow_Add_To_Checkin</bpmn:outgoing>
     </bpmn:userTask>
-    
-    <bpmn:userTask id="Task_UpdateCheckupStatus" name="Complete Checkup Record">
-      <bpmn:documentation>RELATED TABLES:
-1. ct_kham_suc_khoe: Update 'trang_thai' to Completed, set 'thoi_gian_hoan_thanh'.
-2. ct_dot_dieu_tri: Close the individual visit.</bpmn:documentation>
-      <bpmn:incoming>Flow_6</bpmn:incoming>
-      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+
+    <bpmn:userTask id="Task_CheckinEmployee" name="Check-in &amp; Create Visit (ct_dot_dieu_tri)">
+      <bpmn:documentation>Create Visit. Link Visit to Checkup Record. Assign contract ID.</bpmn:documentation>
+      <bpmn:incoming>Flow_Found_Yes</bpmn:incoming>
+      <bpmn:incoming>Flow_Add_To_Checkin</bpmn:incoming>
+      <bpmn:outgoing>Flow_Checkin_To_Perform</bpmn:outgoing>
     </bpmn:userTask>
-    
-    <bpmn:userTask id="Task_FinalizeContract" name="Liquidation &amp; Bulk Billing">
-      <bpmn:documentation>RELATED TABLES:
-1. dm_hop_dong_ksk: Update 'tien_thuc_te' (actual revenue), 'tien_da_thanh_toan'.
-2. dm_hop_dong_ksk: Set 'trang_thai' to Liquidated/Closed.
-3. dm_hop_dong_ksk: 'chot_thanh_toan_dv_ksk' (Lock payment flag).</bpmn:documentation>
-      <bpmn:incoming>Flow_7</bpmn:incoming>
-      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+
+    <bpmn:userTask id="Task_PerformPackageServices" name="Do Package Svcs (ct_dv_ky_thuat)">
+      <bpmn:documentation>Technicians execute labs/X-Ray in Contract Package.</bpmn:documentation>
+      <bpmn:incoming>Flow_Checkin_To_Perform</bpmn:incoming>
+      <bpmn:outgoing>Flow_Perform_To_Consult</bpmn:outgoing>
     </bpmn:userTask>
-    
+
+    <bpmn:userTask id="Task_DoctorConsult" name="Doctor Consult (ct_dv_kham)">
+      <bpmn:documentation>Doctor reviews results. Decides if extra services are needed.</bpmn:documentation>
+      <bpmn:incoming>Flow_Perform_To_Consult</bpmn:incoming>
+      <bpmn:outgoing>Flow_Consult_To_Gateway</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_ExtraService" name="Need Extra Svc?">
+      <bpmn:incoming>Flow_Consult_To_Gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Extra_No</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Extra_Yes</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="Task_OrderExtraService" name="Order Extra (ct_dich_vu)">
+      <bpmn:documentation>Doctor creates new service request in ct_dich_vu.</bpmn:documentation>
+      <bpmn:incoming>Flow_Extra_Yes</bpmn:incoming>
+      <bpmn:outgoing>Flow_OrderExtra_To_Pay</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_PersonalPayment" name="Personal Pay (ct_phieu_thu)">
+      <bpmn:documentation>Employee pays cash for extra items.</bpmn:documentation>
+      <bpmn:incoming>Flow_OrderExtra_To_Pay</bpmn:incoming>
+      <bpmn:outgoing>Flow_Pay_To_ExecExtra</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_PerformExtraService" name="Do Extra Svcs (ct_dv_ky_thuat)">
+      <bpmn:incoming>Flow_Pay_To_ExecExtra</bpmn:incoming>
+      <bpmn:outgoing>Flow_ExecExtra_To_Update</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_UpdateCheckupStatus" name="Close Checkup (ct_kham_suc_khoe)">
+      <bpmn:documentation>Update status, result summary. Close Visit.</bpmn:documentation>
+      <bpmn:incoming>Flow_Extra_No</bpmn:incoming>
+      <bpmn:incoming>Flow_ExecExtra_To_Update</bpmn:incoming>
+      <bpmn:outgoing>Flow_Update_To_Reconcile</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_ReconcileCosts" name="Reconcile (dm_hop_dong_ksk)">
+      <bpmn:documentation>Compare Actual Count vs Contract. Calculate totals.</bpmn:documentation>
+      <bpmn:incoming>Flow_Update_To_Reconcile</bpmn:incoming>
+      <bpmn:outgoing>Flow_Reconcile_To_Finalize</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_FinalizeContract" name="Liquidation (ct_phieu_thu)">
+      <bpmn:documentation>Issue Corporate Invoice. Close Contract.</bpmn:documentation>
+      <bpmn:incoming>Flow_Reconcile_To_Finalize</bpmn:incoming>
+      <bpmn:outgoing>Flow_Finalize_To_End</bpmn:outgoing>
+    </bpmn:userTask>
+
     <bpmn:endEvent id="EndEvent_ContractClosed" name="Contract Closed">
-      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:incoming>Flow_Finalize_To_End</bpmn:incoming>
     </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_Start_To_Create" sourceRef="StartEvent_ContractRequest" targetRef="Task_CreateContract" />
+    <bpmn:sequenceFlow id="Flow_Create_To_Define" sourceRef="Task_CreateContract" targetRef="Task_DefinePackages" />
+    <bpmn:sequenceFlow id="Flow_Define_To_Import" sourceRef="Task_DefinePackages" targetRef="Task_ImportEmployeeList" />
+    <bpmn:sequenceFlow id="Flow_Import_To_Search" sourceRef="Task_ImportEmployeeList" targetRef="Task_SearchEmployee" />
+    <bpmn:sequenceFlow id="Flow_Search_To_Gateway" sourceRef="Task_SearchEmployee" targetRef="Gateway_EmployeeFound" />
     
-    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_ContractRequest" targetRef="Task_CreateContract" />
-    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_CreateContract" targetRef="Task_DefinePackages" />
-    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_DefinePackages" targetRef="Task_ImportEmployeeList" />
-    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_ImportEmployeeList" targetRef="Task_CheckinEmployee" />
-    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_CheckinEmployee" targetRef="Task_PerformCheckupServices" />
-    <bpmn:sequenceFlow id="Flow_6" sourceRef="Task_PerformCheckupServices" targetRef="Task_UpdateCheckupStatus" />
-    <bpmn:sequenceFlow id="Flow_7" sourceRef="Task_UpdateCheckupStatus" targetRef="Task_FinalizeContract" />
-    <bpmn:sequenceFlow id="Flow_8" sourceRef="Task_FinalizeContract" targetRef="EndEvent_ContractClosed" />
+    <bpmn:sequenceFlow id="Flow_Found_No" name="No (Add New)" sourceRef="Gateway_EmployeeFound" targetRef="Task_RegisterNewEmployee" />
+    <bpmn:sequenceFlow id="Flow_Found_Yes" name="Yes" sourceRef="Gateway_EmployeeFound" targetRef="Task_CheckinEmployee" />
+    <bpmn:sequenceFlow id="Flow_Add_To_Checkin" sourceRef="Task_RegisterNewEmployee" targetRef="Task_CheckinEmployee" />
     
+    <bpmn:sequenceFlow id="Flow_Checkin_To_Perform" sourceRef="Task_CheckinEmployee" targetRef="Task_PerformPackageServices" />
+    
+    <bpmn:sequenceFlow id="Flow_Perform_To_Consult" sourceRef="Task_PerformPackageServices" targetRef="Task_DoctorConsult" />
+    <bpmn:sequenceFlow id="Flow_Consult_To_Gateway" sourceRef="Task_DoctorConsult" targetRef="Gateway_ExtraService" />
+    
+    <bpmn:sequenceFlow id="Flow_Extra_Yes" name="Yes" sourceRef="Gateway_ExtraService" targetRef="Task_OrderExtraService" />
+    <bpmn:sequenceFlow id="Flow_OrderExtra_To_Pay" sourceRef="Task_OrderExtraService" targetRef="Task_PersonalPayment" />
+    <bpmn:sequenceFlow id="Flow_Pay_To_ExecExtra" sourceRef="Task_PersonalPayment" targetRef="Task_PerformExtraService" />
+    <bpmn:sequenceFlow id="Flow_ExecExtra_To_Update" sourceRef="Task_PerformExtraService" targetRef="Task_UpdateCheckupStatus" />
+    
+    <bpmn:sequenceFlow id="Flow_Extra_No" name="No" sourceRef="Gateway_ExtraService" targetRef="Task_UpdateCheckupStatus" />
+    
+    <bpmn:sequenceFlow id="Flow_Update_To_Reconcile" sourceRef="Task_UpdateCheckupStatus" targetRef="Task_ReconcileCosts" />
+    <bpmn:sequenceFlow id="Flow_Reconcile_To_Finalize" sourceRef="Task_ReconcileCosts" targetRef="Task_FinalizeContract" />
+    <bpmn:sequenceFlow id="Flow_Finalize_To_End" sourceRef="Task_FinalizeContract" targetRef="EndEvent_ContractClosed" />
+
   </bpmn:process>
-  
-  <bpmndi:BPMNDiagram id="BPMNDiagram_Corp">
-    <bpmndi:BPMNPlane id="BPMNPlane_Corp" bpmnElement="Collaboration_CorpCheckup">
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Corp_V3">
+    <bpmndi:BPMNPlane id="BPMNPlane_Corp_V3" bpmnElement="Collaboration_CorpCheckup">
       <bpmndi:BPMNShape id="Participant_Corp_di" bpmnElement="Participant_CorpCheckup" isHorizontal="true">
-        <dc:Bounds x="120" y="80" width="1200" height="580" />
+        <dc:Bounds x="120" y="80" width="2200" height="700" />
       </bpmndi:BPMNShape>
       
       <bpmndi:BPMNShape id="Lane_Sales_di" bpmnElement="Lane_Sales" isHorizontal="true">
-        <dc:Bounds x="150" y="80" width="1170" height="150" />
+        <dc:Bounds x="150" y="80" width="2170" height="150" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_Admin_di" bpmnElement="Lane_Admin" isHorizontal="true">
-        <dc:Bounds x="150" y="230" width="1170" height="150" />
+        <dc:Bounds x="150" y="230" width="2170" height="180" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_Medical_di" bpmnElement="Lane_Medical" isHorizontal="true">
-        <dc:Bounds x="150" y="380" width="1170" height="130" />
+        <dc:Bounds x="150" y="410" width="2170" height="230" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Lane_Finance_di" bpmnElement="Lane_Finance" isHorizontal="true">
-        <dc:Bounds x="150" y="510" width="1170" height="150" />
+        <dc:Bounds x="150" y="640" width="2170" height="140" />
       </bpmndi:BPMNShape>
-      
+
       <bpmndi:BPMNShape id="StartEvent_di" bpmnElement="StartEvent_ContractRequest">
         <dc:Bounds x="200" y="132" width="36" height="36" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="180" y="175" width="80" height="14" />
-        </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_CreateContract_di" bpmnElement="Task_CreateContract">
         <dc:Bounds x="290" y="110" width="100" height="80" />
@@ -132,61 +194,169 @@
       <bpmndi:BPMNShape id="Task_DefinePackages_di" bpmnElement="Task_DefinePackages">
         <dc:Bounds x="440" y="110" width="100" height="80" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_ImportEmployee_di" bpmnElement="Task_ImportEmployeeList">
-        <dc:Bounds x="440" y="260" width="100" height="80" />
+
+      <bpmndi:BPMNShape id="Task_ImportEmployeeList_di" bpmnElement="Task_ImportEmployeeList">
+        <dc:Bounds x="440" y="280" width="100" height="80" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_Checkin_di" bpmnElement="Task_CheckinEmployee">
-        <dc:Bounds x="590" y="260" width="100" height="80" />
+      <bpmndi:BPMNShape id="Task_SearchEmployee_di" bpmnElement="Task_SearchEmployee">
+        <dc:Bounds x="590" y="280" width="100" height="80" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_Perform_di" bpmnElement="Task_PerformCheckupServices">
-        <dc:Bounds x="700" y="400" width="100" height="80" />
+      <bpmndi:BPMNShape id="Gateway_EmployeeFound_di" bpmnElement="Gateway_EmployeeFound" isMarkerVisible="true">
+        <dc:Bounds x="740" y="295" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="746" y="271" width="38" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_UpdateStatus_di" bpmnElement="Task_UpdateCheckupStatus">
-        <dc:Bounds x="850" y="400" width="100" height="80" />
+      <bpmndi:BPMNShape id="Task_RegisterNewEmployee_di" bpmnElement="Task_RegisterNewEmployee">
+        <dc:Bounds x="830" y="355" width="100" height="80" />
       </bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="Task_Finalize_di" bpmnElement="Task_FinalizeContract">
-        <dc:Bounds x="980" y="540" width="100" height="80" />
+      <bpmndi:BPMNShape id="Task_CheckinEmployee_di" bpmnElement="Task_CheckinEmployee">
+        <dc:Bounds x="980" y="280" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_PerformPackageServices_di" bpmnElement="Task_PerformPackageServices">
+        <dc:Bounds x="870" y="470" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_DoctorConsult_di" bpmnElement="Task_DoctorConsult">
+        <dc:Bounds x="1020" y="470" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Gateway_ExtraService_di" bpmnElement="Gateway_ExtraService" isMarkerVisible="true">
+        <dc:Bounds x="1170" y="485" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1156" y="461" width="77" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_OrderExtraService_di" bpmnElement="Task_OrderExtraService">
+        <dc:Bounds x="1270" y="540" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_PersonalPayment_di" bpmnElement="Task_PersonalPayment">
+        <dc:Bounds x="1420" y="540" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_PerformExtraService_di" bpmnElement="Task_PerformExtraService">
+        <dc:Bounds x="1570" y="540" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_UpdateCheckupStatus_di" bpmnElement="Task_UpdateCheckupStatus">
+        <dc:Bounds x="1730" y="470" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_ReconcileCosts_di" bpmnElement="Task_ReconcileCosts">
+        <dc:Bounds x="1730" y="670" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_FinalizeContract_di" bpmnElement="Task_FinalizeContract">
+        <dc:Bounds x="1880" y="670" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="EndEvent_di" bpmnElement="EndEvent_ContractClosed">
-        <dc:Bounds x="1150" y="562" width="36" height="36" />
-        <bpmndi:BPMNLabel>
-          <dc:Bounds x="1130" y="605" width="80" height="14" />
-        </bpmndi:BPMNLabel>
+        <dc:Bounds x="2030" y="692" width="36" height="36" />
       </bpmndi:BPMNShape>
-      
-      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+
+      <!-- Lane Sales: Start → Create → Define (straight horizontal) -->
+      <bpmndi:BPMNEdge id="Edge_1" bpmnElement="Flow_Start_To_Create">
         <di:waypoint x="236" y="150" />
         <di:waypoint x="290" y="150" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+      <bpmndi:BPMNEdge id="Edge_2" bpmnElement="Flow_Create_To_Define">
         <di:waypoint x="390" y="150" />
         <di:waypoint x="440" y="150" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+
+      <!-- Define → Import (straight down, same x center) -->
+      <bpmndi:BPMNEdge id="Edge_3" bpmnElement="Flow_Define_To_Import">
         <di:waypoint x="490" y="190" />
-        <di:waypoint x="490" y="260" />
+        <di:waypoint x="490" y="280" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
-        <di:waypoint x="540" y="300" />
-        <di:waypoint x="590" y="300" />
+
+      <!-- Lane Admin: Import → Search → Gateway (straight horizontal) -->
+      <bpmndi:BPMNEdge id="Edge_4" bpmnElement="Flow_Import_To_Search">
+        <di:waypoint x="540" y="320" />
+        <di:waypoint x="590" y="320" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
-        <di:waypoint x="640" y="340" />
-        <di:waypoint x="640" y="440" />
-        <di:waypoint x="700" y="440" />
+      <bpmndi:BPMNEdge id="Edge_5" bpmnElement="Flow_Search_To_Gateway">
+        <di:waypoint x="690" y="320" />
+        <di:waypoint x="740" y="320" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
-        <di:waypoint x="800" y="440" />
-        <di:waypoint x="850" y="440" />
+
+      <!-- Gateway "No" → Register: go right from gateway, then down to register -->
+      <bpmndi:BPMNEdge id="Edge_6" bpmnElement="Flow_Found_No">
+        <di:waypoint x="765" y="345" />
+        <di:waypoint x="765" y="395" />
+        <di:waypoint x="830" y="395" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
-        <di:waypoint x="900" y="480" />
-        <di:waypoint x="900" y="580" />
-        <di:waypoint x="980" y="580" />
+
+      <!-- Gateway "Yes" → Checkin: straight horizontal right -->
+      <bpmndi:BPMNEdge id="Edge_7" bpmnElement="Flow_Found_Yes">
+        <di:waypoint x="790" y="320" />
+        <di:waypoint x="980" y="320" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8">
-        <di:waypoint x="1080" y="580" />
-        <di:waypoint x="1150" y="580" />
+
+      <!-- Register → Checkin: go right then up (L-shape) -->
+      <bpmndi:BPMNEdge id="Edge_8" bpmnElement="Flow_Add_To_Checkin">
+        <di:waypoint x="930" y="395" />
+        <di:waypoint x="1030" y="395" />
+        <di:waypoint x="1030" y="360" />
+      </bpmndi:BPMNEdge>
+
+      <!-- Checkin → Perform Package: straight down -->
+      <bpmndi:BPMNEdge id="Edge_9" bpmnElement="Flow_Checkin_To_Perform">
+        <di:waypoint x="1010" y="360" />
+        <di:waypoint x="1010" y="430" />
+        <di:waypoint x="920" y="430" />
+        <di:waypoint x="920" y="470" />
+      </bpmndi:BPMNEdge>
+
+      <!-- Perform → Consult (straight horizontal) -->
+      <bpmndi:BPMNEdge id="Edge_10" bpmnElement="Flow_Perform_To_Consult">
+        <di:waypoint x="970" y="510" />
+        <di:waypoint x="1020" y="510" />
+      </bpmndi:BPMNEdge>
+
+      <!-- Consult → Gateway Extra (straight horizontal) -->
+      <bpmndi:BPMNEdge id="Edge_11" bpmnElement="Flow_Consult_To_Gateway">
+        <di:waypoint x="1120" y="510" />
+        <di:waypoint x="1170" y="510" />
+      </bpmndi:BPMNEdge>
+
+      <!-- Gateway "Yes" → Order Extra: down then right (L-shape) -->
+      <bpmndi:BPMNEdge id="Edge_12" bpmnElement="Flow_Extra_Yes">
+        <di:waypoint x="1195" y="535" />
+        <di:waypoint x="1195" y="580" />
+        <di:waypoint x="1270" y="580" />
+      </bpmndi:BPMNEdge>
+
+      <!-- Order → Pay → ExecExtra (straight horizontal chain) -->
+      <bpmndi:BPMNEdge id="Edge_13" bpmnElement="Flow_OrderExtra_To_Pay">
+        <di:waypoint x="1370" y="580" />
+        <di:waypoint x="1420" y="580" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_14" bpmnElement="Flow_Pay_To_ExecExtra">
+        <di:waypoint x="1520" y="580" />
+        <di:waypoint x="1570" y="580" />
+      </bpmndi:BPMNEdge>
+
+      <!-- ExecExtra → UpdateCheckupStatus: right then up (clean L-shape) -->
+      <bpmndi:BPMNEdge id="Edge_15" bpmnElement="Flow_ExecExtra_To_Update">
+        <di:waypoint x="1670" y="580" />
+        <di:waypoint x="1780" y="580" />
+        <di:waypoint x="1780" y="550" />
+      </bpmndi:BPMNEdge>
+
+      <!-- Gateway "No" → UpdateCheckupStatus: straight horizontal, enters left side at y=490 -->
+      <bpmndi:BPMNEdge id="Edge_16" bpmnElement="Flow_Extra_No">
+        <di:waypoint x="1220" y="510" />
+        <di:waypoint x="1730" y="510" />
+      </bpmndi:BPMNEdge>
+
+      <!-- UpdateCheckupStatus → Reconcile: straight down -->
+      <bpmndi:BPMNEdge id="Edge_17" bpmnElement="Flow_Update_To_Reconcile">
+        <di:waypoint x="1780" y="550" />
+        <di:waypoint x="1780" y="670" />
+      </bpmndi:BPMNEdge>
+
+      <!-- Reconcile → Finalize → End (straight horizontal) -->
+      <bpmndi:BPMNEdge id="Edge_18" bpmnElement="Flow_Reconcile_To_Finalize">
+        <di:waypoint x="1830" y="710" />
+        <di:waypoint x="1880" y="710" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_19" bpmnElement="Flow_Finalize_To_End">
+        <di:waypoint x="1980" y="710" />
+        <di:waypoint x="2030" y="710" />
       </bpmndi:BPMNEdge>
       
     </bpmndi:BPMNPlane>

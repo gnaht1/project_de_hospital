@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_Paraclinical" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.16.0" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.20.0">
+  <bpmn:collaboration id="Collaboration_CLS">
+    <bpmn:participant id="Participant_CLS" name="Paraclinical Process (Lab / Imaging)" processRef="Process_CLS" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_CLS" isExecutable="true">
+    <bpmn:laneSet id="LaneSet_CLS">
+      <bpmn:lane id="Lane_Patient" name="Patient">
+        <bpmn:flowNodeRef>StartEvent_ArriveCLS</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SampleCollection</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Technician" name="Technician (KTV)">
+        <bpmn:flowNodeRef>Task_CheckPayment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ExecuteMachine</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_EnterResult</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Doctor_CLS" name="Approver / Doctor">
+        <bpmn:flowNodeRef>Task_ValidateResult</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_IsResultOK</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_PublishResult</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_ResultAvailable</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+
+    <bpmn:startEvent id="StartEvent_ArriveCLS" name="Patient Arrives at Lab/X-Ray">
+      <bpmn:outgoing>Flow_Arrive_To_Check</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:serviceTask id="Task_CheckPayment" name="Check Payment (ct_dich_vu)">
+      <bpmn:documentation>Verify 'thanh_toan' = 1 (Paid) in ct_dich_vu.
+Except for Emergency/Inpatient.</bpmn:documentation>
+      <bpmn:incoming>Flow_Arrive_To_Check</bpmn:incoming>
+      <bpmn:outgoing>Flow_Check_To_Sample</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="Task_SampleCollection" name="Sample/Image Taking (ct_dv_ky_thuat)">
+      <bpmn:documentation>Update 'thoi_gian_tiep_nhan'.
+Set Status = '20 - Đã tiếp nhận'.</bpmn:documentation>
+      <bpmn:incoming>Flow_Check_To_Sample</bpmn:incoming>
+      <bpmn:outgoing>Flow_Sample_To_Machine</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_ExecuteMachine" name="Analyze/Process (ct_dv_ky_thuat)">
+      <bpmn:documentation>Run sample on Machine.
+Update 'thoi_gian_bat_dau', 'phong_thuc_hien_id'.</bpmn:documentation>
+      <bpmn:incoming>Flow_Sample_To_Machine</bpmn:incoming>
+      <bpmn:outgoing>Flow_Machine_To_Entry</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_EnterResult" name="Enter Results">
+      <bpmn:documentation>Input raw data/image.
+Set Status = '150 - Đã có kết quả'.</bpmn:documentation>
+      <bpmn:incoming>Flow_Machine_To_Entry</bpmn:incoming>
+      <bpmn:outgoing>Flow_Entry_To_Validate</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_ValidateResult" name="Validate Result">
+      <bpmn:documentation>Doctor reviews result vs clinical history.</bpmn:documentation>
+      <bpmn:incoming>Flow_Entry_To_Validate</bpmn:incoming>
+      <bpmn:outgoing>Flow_Validate_To_Gw</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_IsResultOK" name="Approved?">
+      <bpmn:incoming>Flow_Validate_To_Gw</bpmn:incoming>
+      <bpmn:outgoing>Flow_Result_Yes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Result_No</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="Task_PublishResult" name="Publish Result (ct_dv_ky_thuat)">
+      <bpmn:documentation>Set Status = '155 - Đã duyệt'.
+Update 'thoi_gian_hoan_thanh'.
+Result visible to Clinical Doctor.</bpmn:documentation>
+      <bpmn:incoming>Flow_Result_Yes</bpmn:incoming>
+      <bpmn:outgoing>Flow_Publish_To_End</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="EndEvent_ResultAvailable" name="Result Available">
+      <bpmn:incoming>Flow_Publish_To_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_Arrive_To_Check" sourceRef="StartEvent_ArriveCLS" targetRef="Task_CheckPayment" />
+    <bpmn:sequenceFlow id="Flow_Check_To_Sample" sourceRef="Task_CheckPayment" targetRef="Task_SampleCollection" />
+    <bpmn:sequenceFlow id="Flow_Sample_To_Machine" sourceRef="Task_SampleCollection" targetRef="Task_ExecuteMachine" />
+    <bpmn:sequenceFlow id="Flow_Machine_To_Entry" sourceRef="Task_ExecuteMachine" targetRef="Task_EnterResult" />
+    <bpmn:sequenceFlow id="Flow_Entry_To_Validate" sourceRef="Task_EnterResult" targetRef="Task_ValidateResult" />
+    <bpmn:sequenceFlow id="Flow_Validate_To_Gw" sourceRef="Task_ValidateResult" targetRef="Gateway_IsResultOK" />
+    
+    <bpmn:sequenceFlow id="Flow_Result_Yes" name="Yes" sourceRef="Gateway_IsResultOK" targetRef="Task_PublishResult" />
+    <bpmn:sequenceFlow id="Flow_Result_No" name="No (Rerun)" sourceRef="Gateway_IsResultOK" targetRef="Task_ExecuteMachine" />
+    
+    <bpmn:sequenceFlow id="Flow_Publish_To_End" sourceRef="Task_PublishResult" targetRef="EndEvent_ResultAvailable" />
+
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_CLS">
+    <bpmndi:BPMNPlane id="BPMNPlane_CLS" bpmnElement="Collaboration_CLS">
+      <bpmndi:BPMNShape id="Participant_CLS_di" bpmnElement="Participant_CLS" isHorizontal="true">
+        <dc:Bounds x="129" y="80" width="1200" height="450" />
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape id="Lane_Patient_di" bpmnElement="Lane_Patient" isHorizontal="true">
+        <dc:Bounds x="159" y="80" width="1170" height="120" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Technician_di" bpmnElement="Lane_Technician" isHorizontal="true">
+        <dc:Bounds x="159" y="200" width="1170" height="130" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Doctor_di" bpmnElement="Lane_Doctor_CLS" isHorizontal="true">
+        <dc:Bounds x="159" y="330" width="1170" height="200" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="StartEvent_di" bpmnElement="StartEvent_ArriveCLS">
+        <dc:Bounds x="212" y="122" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape id="Task_CheckPay_di" bpmnElement="Task_CheckPayment">
+        <dc:Bounds x="300" y="225" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape id="Task_Sample_di" bpmnElement="Task_SampleCollection">
+        <dc:Bounds x="440" y="100" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_Machine_di" bpmnElement="Task_ExecuteMachine">
+        <dc:Bounds x="580" y="225" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape id="Task_Entry_di" bpmnElement="Task_EnterResult">
+        <dc:Bounds x="720" y="225" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_Validate_di" bpmnElement="Task_ValidateResult">
+        <dc:Bounds x="860" y="390" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Gateway_Res_di" bpmnElement="Gateway_IsResultOK" isMarkerVisible="true">
+        <dc:Bounds x="1000" y="405" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="998" y="462" width="54" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_Publish_di" bpmnElement="Task_PublishResult">
+        <dc:Bounds x="1100" y="390" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="EndEvent_di" bpmnElement="EndEvent_ResultAvailable">
+        <dc:Bounds x="1250" y="412" width="36" height="36" />
+      </bpmndi:BPMNShape>
+
+      <!-- Start → CheckPayment: down then right (clean L-shape) -->
+      <bpmndi:BPMNEdge id="Edge_1" bpmnElement="Flow_Arrive_To_Check">
+        <di:waypoint x="230" y="158" />
+        <di:waypoint x="230" y="265" />
+        <di:waypoint x="300" y="265" />
+      </bpmndi:BPMNEdge>
+
+      <!-- CheckPayment → SampleCollection: right then up (L-shape, wider spacing) -->
+      <bpmndi:BPMNEdge id="Edge_2" bpmnElement="Flow_Check_To_Sample">
+        <di:waypoint x="350" y="225" />
+        <di:waypoint x="350" y="140" />
+        <di:waypoint x="440" y="140" />
+      </bpmndi:BPMNEdge>
+
+      <!-- Sample → Machine: right then down (L-shape, wider spacing) -->
+      <bpmndi:BPMNEdge id="Edge_3" bpmnElement="Flow_Sample_To_Machine">
+        <di:waypoint x="490" y="180" />
+        <di:waypoint x="490" y="265" />
+        <di:waypoint x="580" y="265" />
+      </bpmndi:BPMNEdge>
+
+      <!-- Machine → EnterResult: straight horizontal -->
+      <bpmndi:BPMNEdge id="Edge_4" bpmnElement="Flow_Machine_To_Entry">
+        <di:waypoint x="680" y="265" />
+        <di:waypoint x="720" y="265" />
+      </bpmndi:BPMNEdge>
+
+      <!-- EnterResult → Validate: right then down (L-shape, wider spacing) -->
+      <bpmndi:BPMNEdge id="Edge_5" bpmnElement="Flow_Entry_To_Validate">
+        <di:waypoint x="770" y="305" />
+        <di:waypoint x="770" y="430" />
+        <di:waypoint x="860" y="430" />
+      </bpmndi:BPMNEdge>
+
+      <!-- Validate → Gateway: straight horizontal -->
+      <bpmndi:BPMNEdge id="Edge_6" bpmnElement="Flow_Validate_To_Gw">
+        <di:waypoint x="960" y="430" />
+        <di:waypoint x="1000" y="430" />
+      </bpmndi:BPMNEdge>
+
+      <!-- Gateway Yes → Publish: straight horizontal -->
+      <bpmndi:BPMNEdge id="Edge_Yes" bpmnElement="Flow_Result_Yes">
+        <di:waypoint x="1050" y="430" />
+        <di:waypoint x="1100" y="430" />
+      </bpmndi:BPMNEdge>
+
+      <!-- Gateway No → ExecuteMachine: loop back up, route above tasks, enter from top -->
+      <bpmndi:BPMNEdge id="Edge_No" bpmnElement="Flow_Result_No">
+        <di:waypoint x="1025" y="405" />
+        <di:waypoint x="1025" y="210" />
+        <di:waypoint x="630" y="210" />
+        <di:waypoint x="630" y="225" />
+      </bpmndi:BPMNEdge>
+
+      <!-- Publish → End: straight horizontal -->
+      <bpmndi:BPMNEdge id="Edge_End" bpmnElement="Flow_Publish_To_End">
+        <di:waypoint x="1200" y="430" />
+        <di:waypoint x="1250" y="430" />
+      </bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
