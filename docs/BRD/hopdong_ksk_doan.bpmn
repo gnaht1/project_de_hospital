@@ -11,7 +11,6 @@
         <bpmn:flowNodeRef>Task_DefinePackages</bpmn:flowNodeRef>
       </bpmn:lane>
       <bpmn:lane id="Lane_Admin" name="Reception / Admin">
-        <bpmn:flowNodeRef>Task_ImportEmployeeList</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_SearchEmployee</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Gateway_EmployeeFound</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_RegisterNewEmployee</bpmn:flowNodeRef>
@@ -49,15 +48,9 @@
       <bpmn:outgoing>Flow_Define_To_Import</bpmn:outgoing>
     </bpmn:userTask>
 
-    <bpmn:userTask id="Task_ImportEmployeeList" name="Import List (ct_kham_suc_khoe)">
-      <bpmn:documentation>Bulk insert employees. Map to dm_benh_nhan if exists.</bpmn:documentation>
+    <bpmn:userTask id="Task_SearchEmployee" name="Verify Employee (ct_kham_suc_khoe, dm_benh_nhan)">
+      <bpmn:documentation>Import and verify employee list. Map to dm_benh_nhan.</bpmn:documentation>
       <bpmn:incoming>Flow_Define_To_Import</bpmn:incoming>
-      <bpmn:outgoing>Flow_Import_To_Search</bpmn:outgoing>
-    </bpmn:userTask>
-
-    <bpmn:userTask id="Task_SearchEmployee" name="Verify Employee (ct_kham_suc_khoe)">
-      <bpmn:documentation>Search in uploaded list when employee arrives.</bpmn:documentation>
-      <bpmn:incoming>Flow_Import_To_Search</bpmn:incoming>
       <bpmn:outgoing>Flow_Search_To_Gateway</bpmn:outgoing>
     </bpmn:userTask>
 
@@ -67,7 +60,7 @@
       <bpmn:outgoing>Flow_Found_No</bpmn:outgoing>
     </bpmn:exclusiveGateway>
 
-    <bpmn:userTask id="Task_RegisterNewEmployee" name="Add Employee (ct_kham_suc_khoe)">
+    <bpmn:userTask id="Task_RegisterNewEmployee" name="Add Employee (ct_kham_suc_khoe, dm_benh_nhan)">
       <bpmn:documentation>For new hires/substitutes not in original list.</bpmn:documentation>
       <bpmn:incoming>Flow_Found_No</bpmn:incoming>
       <bpmn:outgoing>Flow_Add_To_Checkin</bpmn:outgoing>
@@ -80,15 +73,16 @@
       <bpmn:outgoing>Flow_Checkin_To_Perform</bpmn:outgoing>
     </bpmn:userTask>
 
-    <bpmn:userTask id="Task_PerformPackageServices" name="Do Package Svcs (ct_dv_ky_thuat)">
+    <bpmn:userTask id="Task_PerformPackageServices" name="Do Package Svcs (ct_dv_ky_thuat, ct_dv_kham)">
       <bpmn:documentation>Technicians execute labs/X-Ray in Contract Package.</bpmn:documentation>
       <bpmn:incoming>Flow_Checkin_To_Perform</bpmn:incoming>
       <bpmn:outgoing>Flow_Perform_To_Consult</bpmn:outgoing>
     </bpmn:userTask>
 
-    <bpmn:userTask id="Task_DoctorConsult" name="Doctor Consult (ct_dv_kham)">
+    <bpmn:userTask id="Task_DoctorConsult" name="Doctor Consult (ct_dv_kham, ct_dv_ky_thuat, ct_dv_kham_ket_luan)">
       <bpmn:documentation>Doctor reviews results. Decides if extra services are needed.</bpmn:documentation>
       <bpmn:incoming>Flow_Perform_To_Consult</bpmn:incoming>
+      <bpmn:incoming>Flow_ExecExtra_To_Consult</bpmn:incoming>
       <bpmn:outgoing>Flow_Consult_To_Gateway</bpmn:outgoing>
     </bpmn:userTask>
 
@@ -112,13 +106,12 @@
 
     <bpmn:userTask id="Task_PerformExtraService" name="Do Extra Svcs (ct_dv_ky_thuat)">
       <bpmn:incoming>Flow_Pay_To_ExecExtra</bpmn:incoming>
-      <bpmn:outgoing>Flow_ExecExtra_To_Update</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ExecExtra_To_Consult</bpmn:outgoing>
     </bpmn:userTask>
 
-    <bpmn:userTask id="Task_UpdateCheckupStatus" name="Close Checkup (ct_kham_suc_khoe)">
-      <bpmn:documentation>Update status, result summary. Close Visit.</bpmn:documentation>
+    <bpmn:userTask id="Task_UpdateCheckupStatus" name="Close Checkup (ct_dv_kham_ket_luan)">
+      <bpmn:documentation>Record final conclusion. Update status, result summary. Close Visit.</bpmn:documentation>
       <bpmn:incoming>Flow_Extra_No</bpmn:incoming>
-      <bpmn:incoming>Flow_ExecExtra_To_Update</bpmn:incoming>
       <bpmn:outgoing>Flow_Update_To_Reconcile</bpmn:outgoing>
     </bpmn:userTask>
 
@@ -140,8 +133,7 @@
 
     <bpmn:sequenceFlow id="Flow_Start_To_Create" sourceRef="StartEvent_ContractRequest" targetRef="Task_CreateContract" />
     <bpmn:sequenceFlow id="Flow_Create_To_Define" sourceRef="Task_CreateContract" targetRef="Task_DefinePackages" />
-    <bpmn:sequenceFlow id="Flow_Define_To_Import" sourceRef="Task_DefinePackages" targetRef="Task_ImportEmployeeList" />
-    <bpmn:sequenceFlow id="Flow_Import_To_Search" sourceRef="Task_ImportEmployeeList" targetRef="Task_SearchEmployee" />
+    <bpmn:sequenceFlow id="Flow_Define_To_Import" sourceRef="Task_DefinePackages" targetRef="Task_SearchEmployee" />
     <bpmn:sequenceFlow id="Flow_Search_To_Gateway" sourceRef="Task_SearchEmployee" targetRef="Gateway_EmployeeFound" />
     
     <bpmn:sequenceFlow id="Flow_Found_No" name="No (Add New)" sourceRef="Gateway_EmployeeFound" targetRef="Task_RegisterNewEmployee" />
@@ -156,7 +148,7 @@
     <bpmn:sequenceFlow id="Flow_Extra_Yes" name="Yes" sourceRef="Gateway_ExtraService" targetRef="Task_OrderExtraService" />
     <bpmn:sequenceFlow id="Flow_OrderExtra_To_Pay" sourceRef="Task_OrderExtraService" targetRef="Task_PersonalPayment" />
     <bpmn:sequenceFlow id="Flow_Pay_To_ExecExtra" sourceRef="Task_PersonalPayment" targetRef="Task_PerformExtraService" />
-    <bpmn:sequenceFlow id="Flow_ExecExtra_To_Update" sourceRef="Task_PerformExtraService" targetRef="Task_UpdateCheckupStatus" />
+    <bpmn:sequenceFlow id="Flow_ExecExtra_To_Consult" sourceRef="Task_PerformExtraService" targetRef="Task_DoctorConsult" />
     
     <bpmn:sequenceFlow id="Flow_Extra_No" name="No" sourceRef="Gateway_ExtraService" targetRef="Task_UpdateCheckupStatus" />
     
@@ -195,11 +187,8 @@
         <dc:Bounds x="440" y="110" width="100" height="80" />
       </bpmndi:BPMNShape>
 
-      <bpmndi:BPMNShape id="Task_ImportEmployeeList_di" bpmnElement="Task_ImportEmployeeList">
-        <dc:Bounds x="440" y="280" width="100" height="80" />
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Task_SearchEmployee_di" bpmnElement="Task_SearchEmployee">
-        <dc:Bounds x="590" y="280" width="100" height="80" />
+        <dc:Bounds x="440" y="280" width="140" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="Gateway_EmployeeFound_di" bpmnElement="Gateway_EmployeeFound" isMarkerVisible="true">
         <dc:Bounds x="740" y="295" width="50" height="50" />
@@ -257,19 +246,15 @@
         <di:waypoint x="440" y="150" />
       </bpmndi:BPMNEdge>
 
-      <!-- Define → Import (straight down, same x center) -->
+      <!-- Define → Verify Employee (straight down) -->
       <bpmndi:BPMNEdge id="Edge_3" bpmnElement="Flow_Define_To_Import">
         <di:waypoint x="490" y="190" />
         <di:waypoint x="490" y="280" />
       </bpmndi:BPMNEdge>
 
-      <!-- Lane Admin: Import → Search → Gateway (straight horizontal) -->
-      <bpmndi:BPMNEdge id="Edge_4" bpmnElement="Flow_Import_To_Search">
-        <di:waypoint x="540" y="320" />
-        <di:waypoint x="590" y="320" />
-      </bpmndi:BPMNEdge>
+      <!-- Verify Employee → Gateway (straight horizontal) -->
       <bpmndi:BPMNEdge id="Edge_5" bpmnElement="Flow_Search_To_Gateway">
-        <di:waypoint x="690" y="320" />
+        <di:waypoint x="580" y="320" />
         <di:waypoint x="740" y="320" />
       </bpmndi:BPMNEdge>
 
@@ -330,14 +315,16 @@
         <di:waypoint x="1570" y="580" />
       </bpmndi:BPMNEdge>
 
-      <!-- ExecExtra → UpdateCheckupStatus: right then up (clean L-shape) -->
-      <bpmndi:BPMNEdge id="Edge_15" bpmnElement="Flow_ExecExtra_To_Update">
+      <!-- ExecExtra → Doctor Consult (Loop back): go right, up, then left back to Consult -->
+      <bpmndi:BPMNEdge id="Edge_15" bpmnElement="Flow_ExecExtra_To_Consult">
         <di:waypoint x="1670" y="580" />
-        <di:waypoint x="1780" y="580" />
-        <di:waypoint x="1780" y="550" />
+        <di:waypoint x="1700" y="580" />
+        <di:waypoint x="1700" y="440" />
+        <di:waypoint x="1070" y="440" />
+        <di:waypoint x="1070" y="470" />
       </bpmndi:BPMNEdge>
 
-      <!-- Gateway "No" → UpdateCheckupStatus: straight horizontal, enters left side at y=490 -->
+      <!-- Gateway "No" → Close Checkup: straight horizontal -->
       <bpmndi:BPMNEdge id="Edge_16" bpmnElement="Flow_Extra_No">
         <di:waypoint x="1220" y="510" />
         <di:waypoint x="1730" y="510" />

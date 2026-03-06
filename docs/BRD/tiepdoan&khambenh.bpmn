@@ -13,8 +13,6 @@
         <bpmn:flowNodeRef>Task_CreatePatientRecord</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_SearchPatient</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Gateway_HasAppointment</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Gateway_PatientType</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Task_CheckInsurance</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_RegisterWalkIn</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_CheckAppointment</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Task_CreateVisitAppt</bpmn:flowNodeRef>
@@ -84,21 +82,10 @@
       <bpmn:outgoing>Flow_ApptVisit_To_Assign</bpmn:outgoing>
     </bpmn:userTask>
 
-    <bpmn:exclusiveGateway id="Gateway_PatientType" name="BHYT or Service?">
-      <bpmn:incoming>Flow_Appt_No</bpmn:incoming>
-      <bpmn:outgoing>Flow_Type_BHYT</bpmn:outgoing>
-      <bpmn:outgoing>Flow_Type_Service</bpmn:outgoing>
-    </bpmn:exclusiveGateway>
 
-    <bpmn:userTask id="Task_CheckInsurance" name="Check BHYT Card (ct_the_bhyt)">
-      <bpmn:documentation>Verify card validity and route (dung_tuyen).</bpmn:documentation>
-      <bpmn:incoming>Flow_Type_BHYT</bpmn:incoming>
-      <bpmn:outgoing>Flow_BHYT_To_Register</bpmn:outgoing>
-    </bpmn:userTask>
 
     <bpmn:userTask id="Task_RegisterWalkIn" name="Register Walk-in (ct_dot_dieu_tri)">
-      <bpmn:incoming>Flow_Type_Service</bpmn:incoming>
-      <bpmn:incoming>Flow_BHYT_To_Register</bpmn:incoming>
+      <bpmn:incoming>Flow_Appt_No</bpmn:incoming>
       <bpmn:outgoing>Flow_WalkIn_To_Assign</bpmn:outgoing>
     </bpmn:userTask>
 
@@ -159,10 +146,7 @@
     <bpmn:sequenceFlow id="Flow_Check_To_CreateApptVisit" sourceRef="Task_CheckAppointment" targetRef="Task_CreateVisitAppt" />
     <bpmn:sequenceFlow id="Flow_ApptVisit_To_Assign" sourceRef="Task_CreateVisitAppt" targetRef="Task_AssignQueue" />
 
-    <bpmn:sequenceFlow id="Flow_Appt_No" name="No (Walk-in)" sourceRef="Gateway_HasAppointment" targetRef="Gateway_PatientType" />
-    <bpmn:sequenceFlow id="Flow_Type_BHYT" name="BHYT" sourceRef="Gateway_PatientType" targetRef="Task_CheckInsurance" />
-    <bpmn:sequenceFlow id="Flow_Type_Service" name="Service" sourceRef="Gateway_PatientType" targetRef="Task_RegisterWalkIn" />
-    <bpmn:sequenceFlow id="Flow_BHYT_To_Register" sourceRef="Task_CheckInsurance" targetRef="Task_RegisterWalkIn" />
+    <bpmn:sequenceFlow id="Flow_Appt_No" name="No (Walk-in)" sourceRef="Gateway_HasAppointment" targetRef="Task_RegisterWalkIn" />
     <bpmn:sequenceFlow id="Flow_WalkIn_To_Assign" sourceRef="Task_RegisterWalkIn" targetRef="Task_AssignQueue" />
 
     <bpmn:sequenceFlow id="Flow_To_Exam" sourceRef="Task_AssignQueue" targetRef="Task_ClinicalExam" />
@@ -236,17 +220,10 @@
         <dc:Bounds x="960" y="250" width="100" height="80" />
       </bpmndi:BPMNShape>
 
-      <bpmndi:BPMNShape id="Gateway_PatientType_di" bpmnElement="Gateway_PatientType" isMarkerVisible="true">
-        <dc:Bounds x="810" y="155" width="50" height="50" />
-        <bpmndi:BPMNLabel><dc:Bounds x="796" y="212" width="78" height="14" /></bpmndi:BPMNLabel>
-      </bpmndi:BPMNShape>
 
-      <bpmndi:BPMNShape id="Task_CheckInsurance_di" bpmnElement="Task_CheckInsurance">
-        <dc:Bounds x="920" y="92" width="100" height="80" />
-      </bpmndi:BPMNShape>
 
       <bpmndi:BPMNShape id="Task_RegisterWalkIn_di" bpmnElement="Task_RegisterWalkIn">
-        <dc:Bounds x="1090" y="140" width="100" height="80" />
+        <dc:Bounds x="900" y="140" width="100" height="80" />
       </bpmndi:BPMNShape>
 
       <bpmndi:BPMNShape id="Task_AssignQueue_di" bpmnElement="Task_AssignQueue">
@@ -352,38 +329,16 @@
         <bpmndi:BPMNLabel><dc:Bounds x="728" y="272" width="18" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
 
-      <!-- HasAppointment No → PatientType: straight horizontal -->
+      <!-- HasAppointment No → RegisterWalkIn: straight horizontal -->
       <bpmndi:BPMNEdge id="Edge_Appt_No" bpmnElement="Flow_Appt_No">
         <di:waypoint x="745" y="180" />
-        <di:waypoint x="810" y="180" />
-        <bpmndi:BPMNLabel><dc:Bounds x="748" y="162" width="60" height="14" /></bpmndi:BPMNLabel>
+        <di:waypoint x="900" y="180" />
+        <bpmndi:BPMNLabel><dc:Bounds x="780" y="162" width="60" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
 
-      <!-- PatientType BHYT → CheckInsurance: up then right (L-shape) -->
-      <bpmndi:BPMNEdge id="Edge_Type_BHYT" bpmnElement="Flow_Type_BHYT">
-        <di:waypoint x="835" y="155" />
-        <di:waypoint x="835" y="132" />
-        <di:waypoint x="920" y="132" />
-        <bpmndi:BPMNLabel><dc:Bounds x="855" y="114" width="30" height="14" /></bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-
-      <!-- PatientType Service → RegisterWalkIn: straight horizontal -->
-      <bpmndi:BPMNEdge id="Edge_Type_Svc" bpmnElement="Flow_Type_Service">
-        <di:waypoint x="860" y="180" />
-        <di:waypoint x="1090" y="180" />
-        <bpmndi:BPMNLabel><dc:Bounds x="945" y="162" width="40" height="14" /></bpmndi:BPMNLabel>
-      </bpmndi:BPMNEdge>
-
-      <!-- CheckInsurance → RegisterWalkIn: right then down, enter top (clean L-shape) -->
-      <bpmndi:BPMNEdge id="Edge_CheckIns_Reg" bpmnElement="Flow_BHYT_To_Register">
-        <di:waypoint x="1020" y="132" />
-        <di:waypoint x="1140" y="132" />
-        <di:waypoint x="1140" y="140" />
-      </bpmndi:BPMNEdge>
-
-      <!-- RegisterWalkIn → AssignQueue: straight horizontal, slight adjustment -->
+      <!-- RegisterWalkIn → AssignQueue: straight horizontal -->
       <bpmndi:BPMNEdge id="Edge_Walkin_Assign" bpmnElement="Flow_WalkIn_To_Assign">
-        <di:waypoint x="1190" y="180" />
+        <di:waypoint x="1000" y="180" />
         <di:waypoint x="1260" y="200" />
       </bpmndi:BPMNEdge>
 
