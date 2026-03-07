@@ -3,8 +3,9 @@ import os
 import config # Import file config.py
 import schemas # Import file schemas.py
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col
-from pyspark.sql.types import StructType, StructField, StringType
+from pyspark.sql.functions import from_json, col, current_timestamp, lit, row_number
+from pyspark.sql.types import StructType, StructField, StringType, TimestampType
+from pyspark.sql.window import Window
 from pyspark.sql.utils import AnalysisException
 
 # Setup Path cho PySpark (Do file config đã chạy rồi nên ở đây chỉ cần append sys.path)
@@ -47,13 +48,12 @@ def create_iceberg_table_if_not_exists(spark, full_table_name, schema):
                 for field in schema.fields
             ])
             
-            # Tạo bảng bằng SQL DDL
+            # Tạo bảng bằng SQL DDL (không partition theo op vì dùng MERGE INTO)
             create_table_sql = f"""
                 CREATE TABLE IF NOT EXISTS {full_table_name} (
                     {fields_ddl}
                 )
                 USING iceberg
-                PARTITIONED BY (op)
             """
             
             spark.sql(create_table_sql)
@@ -62,9 +62,10 @@ def create_iceberg_table_if_not_exists(spark, full_table_name, schema):
             print(f"  -> Lỗi tạo bảng: {e}")
 
 def start_stream_for_topic(spark, topic, conf):
-    """Hàm khởi tạo luồng xử lý cho 1 topic"""
+    """Hàm khởi tạo luồng xử lý cho 1 topic (MERGE INTO / Upsert)"""
     table_name = conf["table_name"]
     raw_schema = conf["schema"]
+    primary_keys = conf["primary_keys"]  # Khóa chính để MERGE
     
     # Lấy Schema đầy đủ (bao gồm vỏ Debezium)
     envelope_schema = schemas.get_debezium_envelope(raw_schema)
@@ -72,10 +73,17 @@ def start_stream_for_topic(spark, topic, conf):
     full_table_name = f"{config.CATALOG_NAME}.{config.DATABASE_NAME}.{table_name}"
     
     print(f"\n>>> [INIT] Khởi tạo stream: {topic} -> {full_table_name}")
+    print(f"    Primary keys: {primary_keys}")
 
     # 1. Đảm bảo bảng đích tồn tại
-    # Schema đích = raw_schema + cột 'op' từ Debezium
-    target_schema = StructType(raw_schema.fields + [StructField("op", StringType(), True)])
+    # Schema đích = raw_schema + op + ts_ms (thời điểm CDC) + ingestion_timestamp (thời điểm Spark xử lý)
+    target_schema = StructType(
+        raw_schema.fields + [
+            StructField("op", StringType(), True),
+            StructField("ts_ms", StringType(), True),
+            StructField("ingestion_timestamp", TimestampType(), True)
+        ]
+    )
     create_iceberg_table_if_not_exists(spark, full_table_name, target_schema)
 
     # 2. Đọc Kafka
@@ -87,15 +95,16 @@ def start_stream_for_topic(spark, topic, conf):
         .load()
 
     # 3. Parse JSON & Flatten Data
-    # Mẹo: Dùng alias để code ngắn hơn
+    # Lấy thêm ts_ms từ Debezium envelope (thời điểm CDC xảy ra)
     df_parsed = df_kafka.selectExpr("CAST(value AS STRING) as json") \
         .select(from_json(col("json"), envelope_schema).alias("data")) \
-        .select("data.after.*", "data.op") \
+        .select("data.after.*", "data.op", "data.ts_ms") \
         .filter("op != 'd'")  # Lọc bản ghi xóa
     
-    # 3.1. Đảm bảo tất cả các field trong schema đều có trong DataFrame
-    # Nếu thiếu field nào, thêm vào với giá trị NULL
-    from pyspark.sql.functions import lit
+    # 3.1. Thêm cột ingestion_timestamp = thời điểm Spark xử lý bản ghi
+    df_parsed = df_parsed.withColumn("ingestion_timestamp", current_timestamp())
+    
+    # 3.2. Đảm bảo tất cả các field trong schema đều có trong DataFrame
     existing_columns = set(df_parsed.columns)
     target_columns = [field.name for field in target_schema.fields]
     
@@ -107,16 +116,57 @@ def start_stream_for_topic(spark, topic, conf):
     df_parsed = df_parsed.select(*target_columns)
     
     if table_name == "dm_khoa_iceberg":
-        print(f">>> ĐANG ÁP DỤNG FILTER CHO BẢNG: {table_name}") # <--- Thêm dòng này để check
+        print(f">>> ĐANG ÁP DỤNG FILTER CHO BẢNG: {table_name}")
         df_parsed = df_parsed.filter("ten != 'TEST_01'")
 
-    # 4. Ghi xuống Iceberg
+    # 4. Ghi xuống Iceberg bằng Upsert (DataFrame-based)
+    # Mỗi lần ghi, Iceberg tạo snapshot mới -> "nhảy version" trên MinIO
+    # Query bình thường luôn lấy snapshot mới nhất (latest version)
+    # Muốn xem data cũ -> dùng Time Travel:
+    #   SELECT * FROM table VERSION AS OF <snapshot_id>;
+    #   SELECT * FROM table TIMESTAMP AS OF '2026-03-01 10:00:00';
+    def upsert_to_iceberg(batch_df, batch_id):
+        """Upsert: PK đã tồn tại -> UPDATE, chưa có -> INSERT.
+        Iceberg tự động tạo snapshot mới sau mỗi lần ghi."""
+        if batch_df.isEmpty():
+            print(f"  [SKIP] Batch {batch_id} | Table: {table_name} | Batch rỗng, bỏ qua.")
+            return
+        
+        print(f"  [PROCESSING] Batch {batch_id} | Table: {table_name} | Incoming rows: {batch_df.count()}")
+        
+        try:
+            # Deduplicate trong cùng 1 batch: giữ bản ghi mới nhất theo ts_ms
+            window_spec = Window.partitionBy(*primary_keys).orderBy(col("ts_ms").desc())
+            new_data = batch_df.withColumn("_row_num", row_number().over(window_spec)) \
+                               .filter("_row_num = 1") \
+                               .drop("_row_num")
+            
+            # Đọc dữ liệu hiện tại trong bảng Iceberg
+            existing_df = batch_df.sparkSession.read.table(full_table_name)
+            
+            # Loại bỏ các bản ghi cũ có cùng PK với batch mới (sẽ được thay bằng bản mới)
+            # LEFT ANTI JOIN: giữ lại các bản ghi cũ KHÔNG CÓ trong batch mới
+            join_condition = [existing_df[pk] == new_data[pk] for pk in primary_keys]
+            remaining_old = existing_df.join(new_data, on=join_condition, how="left_anti")
+            
+            # Union: bản ghi cũ (đã loại trùng) + bản ghi mới
+            result_df = remaining_old.unionByName(new_data)
+            
+            # Ghi đè toàn bộ bảng Iceberg (tạo snapshot mới)
+            result_df.write.format("iceberg").mode("overwrite").save(full_table_name)
+            
+            print(f"  [DONE] Batch {batch_id} | Table: {table_name} | "
+                  f"Old: {existing_df.count()}, New: {new_data.count()}, Result: {result_df.count()}")
+        
+        except Exception as e:
+            print(f"  [ERROR] Batch {batch_id} | Table: {table_name} | Lỗi: {e}")
+            import traceback
+            traceback.print_exc()
+
     query = df_parsed.writeStream \
-        .format("iceberg") \
-        .outputMode("append") \
+        .foreachBatch(upsert_to_iceberg) \
         .trigger(processingTime="30 seconds") \
         .option("checkpointLocation", f"s3a://{config.BUCKET_NAME}/checkpoints/{table_name}") \
-        .option("path", full_table_name) \
         .start()
     
     return query

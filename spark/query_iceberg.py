@@ -260,6 +260,176 @@ def query_dm_nhan_vien(spark):
         ORDER BY so_luong DESC
     """).show()
 
+def view_snapshots(spark, table_name):
+    """Xem danh sách các snapshot (version) của bảng Iceberg"""
+    full_table_name = f"{config.CATALOG_NAME}.{config.DATABASE_NAME}.{table_name}"
+    
+    print(f"\n{'='*80}")
+    print(f"DANH SÁCH SNAPSHOTS (VERSIONS) CỦA BẢNG: {full_table_name}")
+    print(f"{'='*80}")
+    
+    # Xem tất cả snapshots
+    print("\n[1] Tất cả snapshots (mỗi MERGE tạo 1 snapshot mới):")
+    spark.sql(f"SELECT * FROM {full_table_name}.snapshots").show(50, truncate=False)
+    
+    # Xem lịch sử thay đổi
+    print("\n[2] Lịch sử thay đổi (history):")
+    spark.sql(f"SELECT * FROM {full_table_name}.history").show(50, truncate=False)
+    
+    # Xem metadata files
+    print("\n[3] Manifest files:")
+    spark.sql(f"SELECT * FROM {full_table_name}.manifests").show(20, truncate=False)
+
+def time_travel_by_snapshot(spark, table_name, snapshot_id):
+    """Time Travel: Xem dữ liệu tại 1 snapshot cụ thể"""
+    full_table_name = f"{config.CATALOG_NAME}.{config.DATABASE_NAME}.{table_name}"
+    
+    print(f"\n{'='*80}")
+    print(f"TIME TRAVEL - VERSION AS OF {snapshot_id}")
+    print(f"Bảng: {full_table_name}")
+    print(f"{'='*80}")
+    
+    # Dữ liệu tại snapshot đó
+    print(f"\n[1] Dữ liệu tại Snapshot {snapshot_id} (10 bản ghi):")
+    spark.sql(f"""
+        SELECT * FROM {full_table_name} VERSION AS OF {snapshot_id}
+        LIMIT 10
+    """).show(10, truncate=False)
+    
+    # So sánh số lượng bản ghi giữa snapshot cũ và hiện tại
+    old_count = spark.sql(f"""
+        SELECT COUNT(*) as cnt FROM {full_table_name} VERSION AS OF {snapshot_id}
+    """).collect()[0]['cnt']
+    
+    current_count = spark.sql(f"""
+        SELECT COUNT(*) as cnt FROM {full_table_name}
+    """).collect()[0]['cnt']
+    
+    print(f"\n[2] So sánh số lượng bản ghi:")
+    print(f"    Snapshot {snapshot_id}: {old_count:,} bản ghi")
+    print(f"    Hiện tại (latest):     {current_count:,} bản ghi")
+    print(f"    Chênh lệch:           {current_count - old_count:,} bản ghi")
+
+def time_travel_by_timestamp(spark, table_name, timestamp_str):
+    """Time Travel: Xem dữ liệu tại 1 thời điểm cụ thể"""
+    full_table_name = f"{config.CATALOG_NAME}.{config.DATABASE_NAME}.{table_name}"
+    
+    print(f"\n{'='*80}")
+    print(f"TIME TRAVEL - TIMESTAMP AS OF '{timestamp_str}'")
+    print(f"Bảng: {full_table_name}")
+    print(f"{'='*80}")
+    
+    print(f"\n[1] Dữ liệu tại thời điểm '{timestamp_str}' (10 bản ghi):")
+    spark.sql(f"""
+        SELECT * FROM {full_table_name} TIMESTAMP AS OF '{timestamp_str}'
+        LIMIT 10
+    """).show(10, truncate=False)
+    
+    old_count = spark.sql(f"""
+        SELECT COUNT(*) as cnt FROM {full_table_name} TIMESTAMP AS OF '{timestamp_str}'
+    """).collect()[0]['cnt']
+    
+    current_count = spark.sql(f"""
+        SELECT COUNT(*) as cnt FROM {full_table_name}
+    """).collect()[0]['cnt']
+    
+    print(f"\n[2] So sánh:")
+    print(f"    Tại '{timestamp_str}': {old_count:,} bản ghi")
+    print(f"    Hiện tại (latest):     {current_count:,} bản ghi")
+
+def check_cdc_timestamps(spark, table_name):
+    """Kiểm tra cột ts_ms và ingestion_timestamp có dữ liệu không"""
+    full_table_name = f"{config.CATALOG_NAME}.{config.DATABASE_NAME}.{table_name}"
+    
+    print(f"\n{'='*80}")
+    print(f"KIỂM TRA THỜI ĐIỂM PHÁT SINH (ts_ms + ingestion_timestamp)")
+    print(f"Bảng: {full_table_name}")
+    print(f"{'='*80}")
+    
+    # Thống kê ts_ms và ingestion_timestamp
+    print("\n[1] Thống kê cột ts_ms (thời điểm CDC từ Debezium):")
+    spark.sql(f"""
+        SELECT 
+            COUNT(*) as total_records,
+            COUNT(ts_ms) as has_ts_ms,
+            MIN(ts_ms) as earliest_ts_ms,
+            MAX(ts_ms) as latest_ts_ms
+        FROM {full_table_name}
+    """).show(truncate=False)
+    
+    print("\n[2] Thống kê cột ingestion_timestamp (thời điểm Spark xử lý):")
+    spark.sql(f"""
+        SELECT 
+            COUNT(*) as total_records,
+            COUNT(ingestion_timestamp) as has_ingestion_ts,
+            MIN(ingestion_timestamp) as earliest_ingestion,
+            MAX(ingestion_timestamp) as latest_ingestion
+        FROM {full_table_name}
+    """).show(truncate=False)
+    
+    # Thống kê theo loại operation (op)
+    print("\n[3] Thống kê theo loại thao tác (op):")
+    spark.sql(f"""
+        SELECT 
+            op,
+            CASE 
+                WHEN op = 'c' THEN 'CREATE (Insert)'
+                WHEN op = 'u' THEN 'UPDATE'
+                WHEN op = 'r' THEN 'READ (Snapshot)'
+                WHEN op = 'd' THEN 'DELETE'
+                ELSE 'UNKNOWN'
+            END as operation_name,
+            COUNT(*) as so_luong
+        FROM {full_table_name}
+        GROUP BY op
+        ORDER BY so_luong DESC
+    """).show(truncate=False)
+    
+    # Xem 10 bản ghi mới nhất theo ingestion_timestamp
+    print("\n[4] 10 bản ghi mới nhất (theo ingestion_timestamp):")
+    spark.sql(f"""
+        SELECT *
+        FROM {full_table_name}
+        ORDER BY ingestion_timestamp DESC
+        LIMIT 10
+    """).show(10, truncate=False)
+
+def check_dedup(spark, table_name, primary_key):
+    """Kiểm tra dedup: mỗi PK chỉ có đúng 1 bản ghi (latest version)"""
+    full_table_name = f"{config.CATALOG_NAME}.{config.DATABASE_NAME}.{table_name}"
+    
+    print(f"\n{'='*80}")
+    print(f"KIỂM TRA DEDUP (Primary Key: {primary_key})")
+    print(f"Bảng: {full_table_name}")
+    print(f"{'='*80}")
+    
+    # Kiểm tra có PK nào bị trùng không
+    print(f"\n[1] Kiểm tra PK bị trùng lặp (nếu MERGE hoạt động đúng -> không có kết quả):")
+    dup_df = spark.sql(f"""
+        SELECT `{primary_key}`, COUNT(*) as so_ban_ghi
+        FROM {full_table_name}
+        GROUP BY `{primary_key}`
+        HAVING COUNT(*) > 1
+        ORDER BY so_ban_ghi DESC
+        LIMIT 20
+    """)
+    dup_df.show(20, truncate=False)
+    
+    dup_count = dup_df.count()
+    if dup_count == 0:
+        print("    ✅ PASS: Không có PK nào bị trùng lặp! MERGE INTO hoạt động đúng.")
+    else:
+        print(f"    ❌ FAIL: Có {dup_count} PK bị trùng lặp! Cần kiểm tra lại logic MERGE.")
+    
+    # Tổng bản ghi vs PK duy nhất
+    print(f"\n[2] So sánh tổng bản ghi vs PK duy nhất:")
+    spark.sql(f"""
+        SELECT 
+            COUNT(*) as tong_ban_ghi,
+            COUNT(DISTINCT `{primary_key}`) as pk_duy_nhat
+        FROM {full_table_name}
+    """).show(truncate=False)
+
 def custom_query(spark, sql_query):
     """Thực thi truy vấn SQL tùy chỉnh"""
     print(f"\n{'='*80}")
@@ -285,6 +455,7 @@ def main():
         print("\n" + "="*80)
         print("MENU CHỨC NĂNG:")
         print("="*80)
+        print("--- TRUY VẤN CƠ BẢN ---")
         print("1.  Liệt kê tất cả các bảng")
         print("2.  Xem thông tin chi tiết một bảng")
         print("3.  Phân tích bảng DM_KHOA (Danh mục khoa)")
@@ -295,6 +466,14 @@ def main():
         print("8.  Phân tích bảng DM_NHAN_VIEN (Danh mục nhân viên)")
         print("9.  Truy vấn SQL tùy chỉnh")
         print("10. Phân tích tất cả các bảng (tổng quan)")
+        print("")
+        print("--- TEST ICEBERG VERSIONING & TIME TRAVEL ---")
+        print("11. Xem danh sách Snapshots (Versions) của 1 bảng")
+        print("12. Time Travel theo Snapshot ID")
+        print("13. Time Travel theo Timestamp")
+        print("14. Kiểm tra ts_ms & ingestion_timestamp (thời điểm phát sinh)")
+        print("15. Kiểm tra Dedup (PK có bị trùng không?)")
+        print("")
         print("0.  Thoát")
         print("="*80)
         
@@ -358,6 +537,29 @@ def main():
                         print(f"{table:40s} : {count:>10,} bản ghi")
                     except Exception as e:
                         print(f"{table:40s} : Lỗi - {str(e)[:50]}")
+            
+            elif choice == "11":
+                table_name = input("Nhập tên bảng (ví dụ: dm_khoa_iceberg): ").strip()
+                view_snapshots(spark, table_name)
+            
+            elif choice == "12":
+                table_name = input("Nhập tên bảng (ví dụ: dm_khoa_iceberg): ").strip()
+                snapshot_id = input("Nhập Snapshot ID (lấy từ chức năng 11): ").strip()
+                time_travel_by_snapshot(spark, table_name, snapshot_id)
+            
+            elif choice == "13":
+                table_name = input("Nhập tên bảng (ví dụ: dm_khoa_iceberg): ").strip()
+                timestamp_str = input("Nhập timestamp (ví dụ: 2026-03-07 00:00:00): ").strip()
+                time_travel_by_timestamp(spark, table_name, timestamp_str)
+            
+            elif choice == "14":
+                table_name = input("Nhập tên bảng (ví dụ: dm_khoa_iceberg): ").strip()
+                check_cdc_timestamps(spark, table_name)
+            
+            elif choice == "15":
+                table_name = input("Nhập tên bảng (ví dụ: dm_khoa_iceberg): ").strip()
+                primary_key = input("Nhập tên cột Primary Key (ví dụ: id): ").strip()
+                check_dedup(spark, table_name, primary_key)
             
             elif choice == "0":
                 print("\nĐang thoát chương trình...")
