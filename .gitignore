@@ -217,6 +217,8 @@ derby.log
 *.orc
 de_tai_cuoi_khoa_DE - Westmead Hospital.txt
 spark/config.py
+.vscode/
+pyrightconfig.json
 
 # DB Diagram
 docs/dbdiagram/core_hospital.dbdiagram
