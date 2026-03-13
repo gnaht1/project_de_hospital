@@ -186,7 +186,7 @@ cython_debug/
 #  that can be found at https://github.com/github/gitignore/blob/main/Global/VisualStudioCode.gitignore
 #  and can be added to the global gitignore or merged into this file. However, if you prefer, 
 #  you could uncomment the following to ignore the entire vscode folder
-# .vscode/
+.vscode/
 
 # Ruff stuff:
 .ruff_cache/
@@ -219,6 +219,14 @@ de_tai_cuoi_khoa_DE - Westmead Hospital.txt
 spark/config.py
 .vscode/
 pyrightconfig.json
+
+# dbt
+dbt_venv/
+dbt_project/target/
+dbt_project/dbt_packages/
+dbt_project/logs/
+dbt_project/models/.gitkeep
+dbt_project/models/.user.yml
 
 # DB Diagram
 docs/dbdiagram/core_hospital.dbdiagram

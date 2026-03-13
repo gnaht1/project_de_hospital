@@ -1,0 +1,12 @@
+hospital_spark:
+  target: dev
+  outputs:
+    dev:
+      type: spark
+      method: thrift
+      host: localhost
+      port: 10000
+      user: spark
+      schema: db
+      connect_retries: 3
+      connect_timeout: 60
