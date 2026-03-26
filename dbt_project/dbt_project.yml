@@ -13,3 +13,15 @@ snapshot-paths: ["snapshots"]
 clean-targets:
   - "target"
   - "dbt_packages"
+
+models:
+  hospital_datalake:
+    +materialized: table
+    +file_format: iceberg
+    # All models in models/staging will be saved to the 'staging' database
+    staging:
+      +schema: staging
+      
+    # All models in models/marts will be saved to the 'marts' database
+    marts:
+      +schema: marts

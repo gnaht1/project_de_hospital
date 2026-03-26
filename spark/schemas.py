@@ -697,7 +697,7 @@ TABLE_CONFIGS = {
     "his.core_his_prod.ct_nguon_nb": {
         "table_name": "ct_nguon_nb_iceberg",
         "schema": schema_ct_nguon_nb,
-        "primary_keys": ["nb_dot_dieu_tri_id"]
+        "primary_keys": ["nb_dot_dieu_tri_id", "nguon_nb_id"] # Dùng Composite Key
     },
     "his.core_his_prod.ct_phieu_thu": {
         "table_name": "ct_phieu_thu_iceberg",

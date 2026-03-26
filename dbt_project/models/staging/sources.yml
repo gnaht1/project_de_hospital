@@ -1,7 +1,7 @@
 version: 2
 
 sources:
-  - name: hospital_raw
+  - name: core_his
     schema: db 
     tables:
       - name: ct_nguon_nb_iceberg
