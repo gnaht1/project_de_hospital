@@ -16,7 +16,8 @@ FROM (
         CAST(SUBSTR(thoi_gian_chi_dinh, 1, 10) AS DATE) AS order_date,
         -- Add execution time to track dispensed status
         CAST(SUBSTR(thoi_gian_thuc_hien, 1, 10) AS DATE) AS execution_date,
-        so_luong AS quantity
+        so_luong AS quantity,
+        
     FROM {{ source('core_his', 'ct_dich_vu_iceberg') }}
     WHERE deleted = 0 
       AND active = true

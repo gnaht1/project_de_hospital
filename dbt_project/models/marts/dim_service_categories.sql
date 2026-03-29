@@ -1,11 +1,11 @@
 -- models/marts/dim_service_categories.sql
--- Create service category dimension using subquery
+-- Create service category dimension with CLS grouping
 SELECT 
-    sub_dim.service_category_id,
-    sub_dim.category_name
-FROM (
-    SELECT 
-        service_category_id,
-        category_name
-    FROM {{ ref('stg_dm_loai_dich_vu') }}
-) AS sub_dim
+    service_category_id,
+    category_name,
+    CASE 
+        WHEN service_category_id = 20 THEN 'Xét Nghiệm'
+        WHEN service_category_id = 30 THEN 'CĐHA'
+        ELSE 'Khác'
+    END AS cls_group
+FROM {{ ref('stg_dm_loai_dich_vu') }}
