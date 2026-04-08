@@ -1,7 +1,8 @@
 import os
 from config import (
     KAFKA_SERVER, MINIO_URL, ACCESS_KEY, SECRET_KEY,
-    BUCKET_NAME, CATALOG_NAME, DATABASE_NAME
+    BUCKET_NAME, CATALOG_NAME, DATABASE_NAME,
+    POSTGRES_IP, POSTGRES_USER, POSTGRES_PASSWORD
 )
 import schemas
 from pyspark.sql import SparkSession
@@ -77,6 +78,7 @@ def start_stream_for_topic(spark, topic, conf):
         .option("kafka.bootstrap.servers", KAFKA_SERVER) \
         .option("subscribe", topic) \
         .option("startingOffsets", "earliest") \
+        .option("maxOffsetsPerTrigger", 10000) \
         .load()
 
     # Parse JSON & Flatten
@@ -148,15 +150,18 @@ def start_stream_for_topic(spark, topic, conf):
 def main():
     print(">>> INIT LINUX DISTRIBUTED MULTI-TABLE STREAMING...")
 
-    # Init Spark without Windows workarounds
+    # Init Spark with Iceberg JDBC Catalog and PostgreSQL driver
     spark = SparkSession.builder \
         .appName("Hospital_CDC_Master") \
         .master("local[*]") \
-        .config("spark.jars.packages", "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.3,org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.hadoop:hadoop-aws:3.3.4") \
+        .config("spark.jars.packages", "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.3,org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.hadoop:hadoop-aws:3.3.4,org.postgresql:postgresql:42.6.0") \
         .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions") \
-        .config("spark.sql.catalog.my_catalog", "org.apache.iceberg.spark.SparkCatalog") \
-        .config("spark.sql.catalog.my_catalog.type", "hadoop") \
-        .config("spark.sql.catalog.my_catalog.warehouse", f"s3a://{BUCKET_NAME}/iceberg_warehouse") \
+        .config("spark.sql.catalog.his_catalog", "org.apache.iceberg.spark.SparkCatalog") \
+        .config("spark.sql.catalog.his_catalog.catalog-impl", "org.apache.iceberg.jdbc.JdbcCatalog") \
+        .config("spark.sql.catalog.his_catalog.uri", f"jdbc:postgresql://{POSTGRES_IP}:5432/iceberg_catalog") \
+        .config("spark.sql.catalog.his_catalog.jdbc.user", POSTGRES_USER) \
+        .config("spark.sql.catalog.his_catalog.jdbc.password", POSTGRES_PASSWORD) \
+        .config("spark.sql.catalog.his_catalog.warehouse", f"s3a://{BUCKET_NAME}/iceberg_warehouse") \
         .config("spark.hadoop.fs.s3a.endpoint", MINIO_URL) \
         .config("spark.hadoop.fs.s3a.access.key", ACCESS_KEY) \
         .config("spark.hadoop.fs.s3a.secret.key", SECRET_KEY) \
@@ -166,6 +171,11 @@ def main():
         .getOrCreate()
 
     spark.sparkContext.setLogLevel("WARN")
+
+    # Create the mandatory default schema for Thrift Server sessions
+    spark.sql(f"CREATE DATABASE IF NOT EXISTS {CATALOG_NAME}.default")
+    
+    # Create database if not exists using the JDBC catalog
     spark.sql(f"CREATE DATABASE IF NOT EXISTS {CATALOG_NAME}.{DATABASE_NAME}")
 
     active_streams = []
