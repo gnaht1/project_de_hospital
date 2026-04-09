@@ -4,5 +4,6 @@ SELECT
     CAST(thoi_gian_thanh_toan AS TIMESTAMP) AS thoi_gian_thanh_toan,
     thanh_toan AS trang_thai_thanh_toan,
     active,
-    deleted
+    deleted,
+    nb_dot_dieu_tri_id
 FROM {{ source('raw_hospital', 'ct_phieu_thu_iceberg') }}

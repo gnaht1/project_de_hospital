@@ -4,7 +4,7 @@ with classified_visits as (
 
 monthly_aggregation as (
     select
-        visit_year,
+        visit_year as stat_year,
         visit_month_num,
         -- Create a formatted label like 'T01', 'T02' using STRING
         'T' || lpad(cast(visit_month_num as string), 2, '0') as month_label,
@@ -21,7 +21,7 @@ monthly_aggregation as (
 )
 
 select
-    visit_year,
+    stat_year,
     visit_month_num,
     month_label,
     visit_type,
@@ -29,5 +29,5 @@ select
 from monthly_aggregation
 -- Order chronologically for BI tools
 order by 
-    visit_year desc, 
+    stat_year desc, 
     visit_month_num asc
