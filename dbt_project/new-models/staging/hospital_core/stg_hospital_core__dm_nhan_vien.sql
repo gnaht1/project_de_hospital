@@ -1,20 +1,29 @@
 with source as (
-    -- Read raw employee data
     select * from {{ source('raw_hospital', 'dm_nhan_vien_iceberg') }}
 ),
 
-renamed as (
+parsed_specialties as (
     select
         id as nhan_vien_id,
+        ten as doctor_name,
+        
+        -- Restore the academic title ID for the HR dashboard
         hoc_ham_hoc_vi_id,
-        -- Extract the timestamp when the employee joined/was created
+        
+        -- Remove brackets '[' and ']', split by comma, and take the first element (index 0)
+        -- Cast the result to INT to ensure safe JOINs later
+        cast(
+            split(regexp_replace(ds_chuyen_khoa_id, '\\[|\\]', ''), ',')[0] 
+            as int
+        ) as primary_chuyen_khoa_id,
+        
         cast(created_at as timestamp) as joined_at,
         active as is_active,
         deleted as is_deleted
     from source
-    -- Keep only currently active employees for this snapshot
+    -- Keep only active doctors
     where deleted = 0 
       and active = true
 )
 
-select * from renamed
+select * from parsed_specialties
