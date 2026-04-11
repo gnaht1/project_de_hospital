@@ -16,6 +16,7 @@ renamed_and_casted as (
         -- Date parsing
         cast(thoi_gian_vao_vien as timestamp) as admission_time,
         khoa_id,
+        nb_thong_tin_id,
         -- Audit fields
         active as is_active,
         deleted as is_deleted
