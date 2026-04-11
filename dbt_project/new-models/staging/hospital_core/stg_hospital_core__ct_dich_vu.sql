@@ -15,6 +15,7 @@ renamed_and_casted as (
         tien_nb_tu_tra,
         phieu_thu_id,
         khoa_chi_dinh_id,
+        nb_dot_dieu_tri_id as dot_dieu_tri_id,
         bac_si_chi_dinh_id,
         cast(nb_chuyen_khoa_id as int) as nb_chuyen_khoa_id,
         active as is_active,
