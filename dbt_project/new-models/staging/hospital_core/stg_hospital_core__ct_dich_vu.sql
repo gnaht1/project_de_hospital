@@ -17,6 +17,9 @@ renamed_and_casted as (
         khoa_chi_dinh_id,
         nb_dot_dieu_tri_id as dot_dieu_tri_id,
         bac_si_chi_dinh_id,
+        trang_thai_hoan,
+        so_luong,
+        gia_goc,
         cast(nb_chuyen_khoa_id as int) as nb_chuyen_khoa_id,
         active as is_active,
         deleted as is_deleted

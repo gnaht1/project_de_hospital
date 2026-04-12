@@ -17,8 +17,8 @@ FROM (
     FROM (
         SELECT
             ky_doanh_thu,
-            nam_doanh_thu,
-            thang_doanh_thu,
+            nam_doanh_thu as stat_year,
+            thang_doanh_thu as stat_month,
             SUM(thanh_tien) AS tong_doanh_thu
         FROM {{ ref('int_finance__valid_payments') }}
         GROUP BY 1,2,3

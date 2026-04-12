@@ -30,7 +30,8 @@ revenue_facts as (
             coalesce(tien_nb_phu_thu, 0) + 
             coalesce(tien_nb_tu_tra, 0)
         ) as total_amount,
-        dot_dieu_tri_id
+        dot_dieu_tri_id,
+        loai_dich_vu_id
         
     from stg_dich_vu
     where is_active = true
