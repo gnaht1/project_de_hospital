@@ -1,44 +1,54 @@
-with dot_dieu_tri as (
-    select * from {{ ref('stg_hospital_core__ct_dot_dieu_tri') }}
-    -- Temporary turn off  filter for testing
-    where date_trunc('day', admission_time) = '2026-02-20'
+with enriched_episodes_today as (
+    -- 1. Gọi bảng Silver ra và lọc lấy ngày đang test
+    select * from {{ ref('int_clinical__enriched_episodes') }}
+    where date_trunc('day', admission_time) = date '2026-01-13'
 ),
 
-benh_nhan as (
-    -- Fetch patient demographics (Name, Gender, Code)
-    select * from {{ ref('stg_hospital_core__dm_benh_nhan') }}
-),
-
-doi_tuong as (
-    -- Fetch patient category names (e.g., BHYT, Viện phí)
-    select * from {{ ref('stg_hospital_core__dm_doi_tuong_kcb') }}
-),
-
-khoa as (
-    -- Fetch department names
-    select khoa_id, department_name from {{ ref('stg_hospital_core__dm_khoa') }}
-),
-
-joined_list as (
-    select
-        bn.patient_code as ma_hs,
-        bn.patient_name as benh_nhan,
-        kp.department_name as khoa,
+technical_status as (
+    -- 2. Aggregate technical service statuses into 4 main categories
+    select 
+        nb_dot_dieu_tri_id,
         
-        -- Priority for patient category
-        case 
-            when dt.is_health_check = true then 'KSK Đoàn'
-            else coalesce(dt_kcb.patient_type_name, 'Dịch vụ')
-        end as doi_tuong,
+        -- Mapping logic: We assign a priority rank to each status code.
+        -- The minimum rank (earliest stage) determines the overall patient status.
+        -- Rank 1: Chờ Tiếp Nhận (20, 25)
+        -- Rank 2: Đang Thực Hiện (40, 43, 46, 50, 60, 63, 66, 70, 80, 90)
+        -- Rank 3: Có Kết Quả (100, 130, 140)
+        -- Rank 4: Đã Duyệt (150, 155)
+        case min(
+            case 
+                when trang_thai in (20, 25) then 1
+                when trang_thai in (40, 43, 46, 50, 60, 63, 66, 70, 80, 90) then 2
+                when trang_thai in (100, 130, 140) then 3
+                when trang_thai in (150, 155) then 4
+                else 5
+            end
+        )
+            when 1 then 'Chờ Tiếp Nhận'
+            when 2 then 'Đang Thực Hiện'
+            when 3 then 'Có Kết Quả'
+            when 4 then 'Đã Duyệt'
+            else 'Khác'
+        end as summary_status
         
-        date_format(admission_time, 'HH:mm') as thoi_gian_vao
-        
-    from dot_dieu_tri dt
-    left join benh_nhan bn on dt.nb_thong_tin_id = bn.patient_id
-    left join doi_tuong dt_kcb on dt.doi_tuong_kcb_id = dt_kcb.doi_tuong_kcb_id
-    left join khoa kp on dt.khoa_id = kp.khoa_id
+    from {{ ref('stg_hospital_core__ct_dv_ky_thuat') }}
+    
+    -- Filter by clinical operational time to ensure accuracy
+    where date_trunc('day', coalesce(thoi_gian_lay_so, thoi_gian_tiep_nhan)) = date '2026-01-13'
+    group by 1
 )
 
-select * from joined_list
--- Sort descending so the most recent patient appears at the top
-order by thoi_gian_vao desc
+select
+    e.ma_hs,
+    e.benh_nhan,
+    e.khoa,
+    e.doi_tuong,
+    date_format(e.admission_time, 'HH:mm') as thoi_gian_vao,
+    
+    -- Lấy trạng thái, nếu NULL thì gán là Mới tiếp nhận
+    coalesce(ts.summary_status, 'Mới tiếp nhận') as trang_thai
+
+from enriched_episodes_today e
+left join technical_status ts on e.nb_dot_dieu_tri_id = ts.nb_dot_dieu_tri_id
+
+order by e.admission_time desc

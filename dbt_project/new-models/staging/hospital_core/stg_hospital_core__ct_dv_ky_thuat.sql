@@ -6,12 +6,15 @@ renamed_and_casted as (
     select
         -- In a 1:1 inheritance model, the ID itself is the service ID
         id as dich_vu_id,
-        
+        nb_dot_dieu_tri_id,
         phong_thuc_hien_id,
         trang_thai,
+        thoi_gian_lay_so,
+        thoi_gian_tiep_nhan,
         
         active as is_active,
-        deleted as is_deleted
+        deleted as is_deleted,
+        created_at
     from source
     where deleted = 0 
       and active = true

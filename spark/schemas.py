@@ -351,7 +351,7 @@ schema_ct_phieu_thu = StructType([
 # Table 13: DM_BENH_NHAN
 schema_dm_benh_nhan = StructType([
     StructField("nb_thong_tin_id", IntegerType(), True),
-    StructField("ma_nb", IntegerType(), True),
+    StructField("ma_nb", StringType(), True),
     StructField("email", StringType(), True),
     StructField("ngay_sinh", StringType(), True),
     StructField("noi_lam_viec", StringType(), True),

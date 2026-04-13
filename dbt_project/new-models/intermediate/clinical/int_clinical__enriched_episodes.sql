@@ -1,5 +1,6 @@
 with dot_dieu_tri as (
     select * from {{ ref('stg_hospital_core__ct_dot_dieu_tri') }}
+    -- Đã bỏ bộ lọc ngày ở đây để lưu lịch sử All-time
 ),
 
 benh_nhan as (
@@ -22,7 +23,6 @@ select
     bn.patient_name as benh_nhan,
     kp.department_name as khoa,
     
-    -- Xử lý logic Đối tượng KCB một lần duy nhất ở đây
     case 
         when dt.is_health_check = true then 'KSK Đoàn'
         else coalesce(dt_kcb.patient_type_name, 'Dịch vụ')
