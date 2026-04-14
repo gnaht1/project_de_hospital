@@ -1,54 +1,54 @@
 with revenue_data as (
-    select * from {{ ref('int_finance__revenue_transactions') }}
+    select * from {{ ref('int_finance__paid_service_transactions') }}
 ),
 
 categorized_revenue as (
     select
-        extract(year from order_time) as stat_year,
-        extract(month from order_time) as stat_month,
-        date_trunc('month', cast(order_time as timestamp)) as stat_date,
-        
-        -- Gom nhóm ID theo bảng mapping bạn vừa cung cấp
-        case 
+        extract(year from payment_time) as stat_year,
+        extract(month from payment_time) as stat_month,
+        cast(date_trunc('month', payment_time) as date) as stat_date,
+        case
             when loai_dich_vu_id = 10 then 'Khám bệnh'
             when loai_dich_vu_id = 20 then 'Xét nghiệm'
             when loai_dich_vu_id = 30 then 'CĐHA'
             when loai_dich_vu_id in (40, 45) then 'PTTT'
             when loai_dich_vu_id = 90 then 'Thuốc'
-            else 'Khác'
+            else coalesce(service_type_name, 'Khác')
         end as service_group,
-        
         total_amount
     from revenue_data
 ),
 
 monthly_summary as (
-    -- Bước 1: Tính tổng tiền cho từng nhóm trong từng tháng
     select
         stat_year,
         stat_month,
         stat_date,
         'T' || lpad(cast(stat_month as string), 2, '0') as month_label,
         service_group,
-        sum(total_amount) as group_revenue
+        sum(total_amount) as group_revenue,
+        case
+            when service_group = 'Khám bệnh' then 1
+            when service_group = 'Xét nghiệm' then 2
+            when service_group = 'CĐHA' then 3
+            when service_group = 'Thuốc' then 4
+            when service_group = 'PTTT' then 5
+            else 99
+        end as display_order
     from categorized_revenue
-    group by 1, 2, 3, 4, 5
+    group by 1, 2, 3, 4, 5, 7
 ),
 
 percentage_calc as (
-    -- Bước 2: Dùng Window Function để chia % (giống hệt chart Tái Khám)
     select
         stat_year,
         stat_month,
         stat_date,
         month_label,
         service_group,
-        
         group_revenue,
-        
-        -- Tính tỷ trọng % của nhóm đó so với tổng doanh thu cả tháng
+        display_order,
         cast(group_revenue as double) / sum(group_revenue) over(partition by stat_year, stat_month) as revenue_percentage
-        
     from monthly_summary
 )
 
