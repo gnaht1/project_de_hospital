@@ -523,7 +523,7 @@ Table dm_hop_dong_ksk [note: "Bảng quản lý thông tin các hợp đồng kh
   tien_mien_giam_hop_dong float [note: "Số tiền miễn giảm được tính trên tổng giá trị hợp đồng"]
   tien_thuc_te float [note: "Tổng doanh thu thực tế phát sinh khi thực hiện hợp đồng"]
   tien_thuc_te_sau_giam float [note: "Tổng doanh thu thực tế sau khi trừ giảm giá"]
-  trang_thai int [note: "Trạng thái quy trình của hợp đồng (Ví dụ: 0=Mới, 1=Đang thực hiện, 2=Đã thanh lý)"]
+  trang_thai int [note: "Trạng thái quy trình của hợp đồng (Ví dụ: 0=Mới, 40=Đang thực hiện"]
   chot_thanh_toan_dv_ksk float [note: "Đánh dấu trạng thái đã chốt thanh toán các dịch vụ trong gói KSK"]
   tien_nb_da_thanh_toan float [note: "Số tiền người bệnh đã tự thanh toán thêm"]
   tien_tai_tro_nb float [note: "Số tiền được tài trợ cho người bệnh"]
