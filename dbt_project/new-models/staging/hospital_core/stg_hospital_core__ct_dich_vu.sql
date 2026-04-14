@@ -9,6 +9,7 @@ renamed_and_casted as (
         loai_dich_vu as loai_dich_vu_id,
         -- Use indication time for volume tracking
         cast(thoi_gian_chi_dinh as timestamp) as order_time,
+        thanh_toan as payment_status,
         tien_bh_thanh_toan,
         tien_nb_cung_chi_tra,
         tien_nb_phu_thu,

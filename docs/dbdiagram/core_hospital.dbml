@@ -72,7 +72,7 @@ Table ct_dich_vu [note: "Bảng chi tiết dịch vụ (thuốc, vật tư, CLS.
   
   // --- Tài chính: Thanh toán & Tính toán ---
   so_luong float [note: "Số lượng chỉ định"]
-  thanh_toan int [note: "Trạng thái thanh toán (0: Chưa, 1: Đã thanh toán)"]
+  thanh_toan int [note: "Trạng thái thanh toán (0: Chưa, 50: Đã thanh toán)"]
   phieu_thu_id int [note: "Khóa ngoại: ID phiếu thu tiền"]
   phat_hanh_hoa_don boolean [note: "Flag: Trạng thái đã xuất hóa đơn"]
   loai_hinh_thanh_toan_id int [note: "ID hình thức thanh toán"]
