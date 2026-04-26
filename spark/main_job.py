@@ -7,22 +7,24 @@ from config import (
 import schemas
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, current_timestamp, lit, row_number
-from pyspark.sql.types import StructType, StructField, StringType, TimestampType, IntegerType, BooleanType, DoubleType, FloatType, LongType
+from pyspark.sql.types import (
+    StructType, StructField, StringType, TimestampType, 
+    IntegerType, BooleanType, DoubleType, FloatType, LongType
+)
 from pyspark.sql.window import Window
 from pyspark.sql.utils import AnalysisException
 
 def create_iceberg_table_if_not_exists(spark, full_table_name, schema):
     """
-    Create Iceberg table if it does not exist using Spark SQL DDL.
+    Create Iceberg table with optimized properties for CDC and auto-maintenance.
     """
     try:
         spark.read.table(full_table_name)
         print(f"  [OK] Table {full_table_name} exists.")
     except AnalysisException:
-        print(f"  [NEW] Creating table {full_table_name}...")
+        print(f"  [NEW] Creating table {full_table_name} with optimizations...")
         try:
             def spark_type_to_sql(spark_type):
-                # Convert PySpark DataType to SQL Type String
                 if isinstance(spark_type, IntegerType): return "INT"
                 elif isinstance(spark_type, StringType): return "STRING"
                 elif isinstance(spark_type, BooleanType): return "BOOLEAN"
@@ -37,20 +39,29 @@ def create_iceberg_table_if_not_exists(spark, full_table_name, schema):
                 for field in schema.fields
             ])
             
+            # Optimization: format-version 2 is required for Row-level deletes/upserts
+            # Auto-cleanup metadata to prevent PostgreSQL bloat
             create_table_sql = f"""
                 CREATE TABLE IF NOT EXISTS {full_table_name} (
                     {fields_ddl}
                 )
                 USING iceberg
+                TBLPROPERTIES (
+                    'format-version' = '2',
+                    'write.upsert.enabled' = 'true',
+                    'write.metadata.delete-after-commit.enabled' = 'true',
+                    'write.metadata.previous-versions-max' = '10',
+                    'write.distribution-mode' = 'hash'
+                )
             """
             spark.sql(create_table_sql)
-            print("  -> Created successfully!")
+            print("  -> Created successfully with TBLPROPERTIES!")
         except Exception as e:
             print(f"  -> Error creating table: {e}")
 
 def start_stream_for_topic(spark, topic, conf):
     """
-    Initialize structured streaming for a Kafka topic and process micro-batches.
+    Initialize structured streaming for a Kafka topic with Upsert and Delete support.
     """
     table_name = conf["table_name"]
     raw_schema = conf["schema"]
@@ -61,7 +72,6 @@ def start_stream_for_topic(spark, topic, conf):
     
     print(f"\n>>> [INIT] Stream: {topic} -> {full_table_name}")
 
-    # Define target schema including CDC metadata
     target_schema = StructType(
         raw_schema.fields + [
             StructField("op", StringType(), True),
@@ -72,88 +82,85 @@ def start_stream_for_topic(spark, topic, conf):
     
     create_iceberg_table_if_not_exists(spark, full_table_name, target_schema)
 
-    # Read from Kafka
+    # Read from Kafka with optimized trigger offsets
     df_kafka = spark.readStream \
         .format("kafka") \
         .option("kafka.bootstrap.servers", KAFKA_SERVER) \
         .option("subscribe", topic) \
         .option("startingOffsets", "earliest") \
-        .option("maxOffsetsPerTrigger", 10000) \
+        .option("maxOffsetsPerTrigger", 20000) \
         .load()
 
-    # Parse JSON & Flatten
+    # Parse JSON & Flatten (Included 'op' for delete handling)
     df_parsed = df_kafka.selectExpr("CAST(value AS STRING) as json") \
         .select(from_json(col("json"), envelope_schema).alias("data")) \
-        .select("data.after.*", "data.op", "data.ts_ms") \
-        .filter("op != 'd'") # Ignore hard deletes for now
+        .select("data.after.*", "data.op", "data.ts_ms") 
     
     df_parsed = df_parsed.withColumn("ingestion_timestamp", current_timestamp())
     
-    # Ensure all target columns exist to prevent schema mismatch
+    # Fill missing columns with NULL to maintain schema consistency
     existing_columns = set(df_parsed.columns)
     target_columns = [field.name for field in target_schema.fields]
-    
     for col_name in target_columns:
         if col_name not in existing_columns:
             df_parsed = df_parsed.withColumn(col_name, lit(None).cast(StringType()))
             
     df_parsed = df_parsed.select(*target_columns)
 
-    # Define upsert logic using MERGE INTO
     def upsert_to_iceberg(batch_df, batch_id):
         if batch_df.isEmpty():
             return
             
-        # 1. Deduplicate in the current batch (keep latest ts_ms)
+        # 1. Deduplicate within the micro-batch to handle multiple updates to same key
         window_spec = Window.partitionBy(*primary_keys).orderBy(col("ts_ms").desc())
         dedup_df = batch_df.withColumn("_row_num", row_number().over(window_spec)) \
                            .filter("_row_num = 1") \
                            .drop("_row_num")
         
-        # 2. Register temporary view for the micro-batch
-        temp_view_name = f"temp_updates_{table_name}_{batch_id}"
+        temp_view_name = f"temp_updates_{table_name.replace('.', '_')}_{batch_id}"
         dedup_df.createOrReplaceTempView(temp_view_name)
         
-        # 3. Build dynamic MERGE INTO SQL
+        # 2. Build MERGE INTO SQL with DELETE support (op = 'd')
         join_cond = " AND ".join([f"t.{pk} = s.{pk}" for pk in primary_keys])
-        cols = dedup_df.columns
-        update_set = ", ".join([f"t.{c} = s.{c}" for c in cols])
-        insert_cols = ", ".join([f"{c}" for c in cols])
-        insert_vals = ", ".join([f"s.{c}" for c in cols])
+        cols = [c for c in dedup_df.columns if c != 'op'] # Exclude 'op' from update set if preferred
+        update_set = ", ".join([f"t.{c} = s.{c}" for c in dedup_df.columns])
+        insert_cols = ", ".join([f"{c}" for c in dedup_df.columns])
+        insert_vals = ", ".join([f"s.{c}" for c in dedup_df.columns])
         
+        # Support Hard Deletes from Debezium (op='d')
         merge_sql = f"""
             MERGE INTO {full_table_name} t
             USING {temp_view_name} s
             ON {join_cond}
+            WHEN MATCHED AND s.op = 'd' THEN DELETE
             WHEN MATCHED THEN UPDATE SET {update_set}
-            WHEN NOT MATCHED THEN INSERT ({insert_cols}) VALUES ({insert_vals})
+            WHEN NOT MATCHED AND s.op != 'd' THEN INSERT ({insert_cols}) VALUES ({insert_vals})
         """
         
-        # 4. Execute MERGE and clean up
         try:
             batch_df.sparkSession.sql(merge_sql)
-            print(f"  [DONE] Batch {batch_id} | Table: {table_name} | Upserted {dedup_df.count()} rows.")
+            # Log without extra count() scan to save time
+            print(f"  [DONE] Batch {batch_id} | Table: {table_name} | Upsert/Delete processed.")
         except Exception as e:
             print(f"  [ERROR] Batch {batch_id} | Table: {table_name} | Error: {e}")
         finally:
             batch_df.sparkSession.catalog.dropTempView(temp_view_name)
 
-    # Start streaming query
+    # Start streaming with longer trigger to allow file merging (Compaction friendly)
     query = df_parsed.writeStream \
         .foreachBatch(upsert_to_iceberg) \
-        .trigger(processingTime="30 seconds") \
+        .trigger(processingTime="1 minute") \
         .option("checkpointLocation", f"s3a://{BUCKET_NAME}/checkpoints/{table_name}") \
         .start()
     
     return query
 
 def main():
-    print(">>> INIT LINUX DISTRIBUTED MULTI-TABLE STREAMING...")
+    print(">>> STARTING OPTIMIZED HOSPITAL LAKEHOUSE STREAMING...")
 
-    # Init Spark with Iceberg JDBC Catalog and PostgreSQL driver
+    # Spark Engine Tuning for Streaming
     spark = SparkSession.builder \
-        .appName("Hospital_CDC_Master") \
-        .master("local[*]") \
+        .appName("Hospital_CDC_Optimized") \
         .config("spark.jars.packages", "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.3,org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.apache.hadoop:hadoop-aws:3.3.4,org.postgresql:postgresql:42.6.0") \
         .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions") \
         .config("spark.sql.catalog.his_catalog", "org.apache.iceberg.spark.SparkCatalog") \
@@ -162,6 +169,7 @@ def main():
         .config("spark.sql.catalog.his_catalog.jdbc.user", POSTGRES_USER) \
         .config("spark.sql.catalog.his_catalog.jdbc.password", POSTGRES_PASSWORD) \
         .config("spark.sql.catalog.his_catalog.warehouse", f"s3a://{BUCKET_NAME}/iceberg_warehouse") \
+        .config("spark.sql.shuffle.partitions", "4") \
         .config("spark.hadoop.fs.s3a.endpoint", MINIO_URL) \
         .config("spark.hadoop.fs.s3a.access.key", ACCESS_KEY) \
         .config("spark.hadoop.fs.s3a.secret.key", SECRET_KEY) \
@@ -172,15 +180,11 @@ def main():
 
     spark.sparkContext.setLogLevel("WARN")
 
-    # Create the mandatory default schema for Thrift Server sessions
+    # DB Initializations
     spark.sql(f"CREATE DATABASE IF NOT EXISTS {CATALOG_NAME}.default")
-    
-    # Create database if not exists using the JDBC catalog
     spark.sql(f"CREATE DATABASE IF NOT EXISTS {CATALOG_NAME}.{DATABASE_NAME}")
 
     active_streams = []
-
-    # Start all streams defined in schemas.py
     for topic, conf in schemas.TABLE_CONFIGS.items():
         try:
             stream = start_stream_for_topic(spark, topic, conf)
@@ -188,7 +192,7 @@ def main():
         except Exception as e:
             print(f"!!! ERROR INIT TOPIC {topic}: {e}")
 
-    print(f"\n>>> ACTIVATED {len(active_streams)} STREAM(S). RUNNING...")
+    print(f"\n>>> ACTIVATED {len(active_streams)} STREAM(S). MONITORING...")
     spark.streams.awaitAnyTermination()
 
 if __name__ == "__main__":
