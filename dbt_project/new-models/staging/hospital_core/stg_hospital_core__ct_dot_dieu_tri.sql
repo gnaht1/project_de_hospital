@@ -25,6 +25,7 @@ renamed_and_casted as (
     -- Filter out soft-deleted records
     where deleted = 0 
       and active = true
+      and cast(thoi_gian_vao_vien as date) >= date '2026-04-16'
 )
 
 select * from renamed_and_casted
