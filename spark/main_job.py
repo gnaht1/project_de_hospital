@@ -88,7 +88,7 @@ def start_stream_for_topic(spark, topic, conf):
         .option("kafka.bootstrap.servers", KAFKA_SERVER) \
         .option("subscribe", topic) \
         .option("startingOffsets", "earliest") \
-        .option("maxOffsetsPerTrigger", 20000) \
+        .option("maxOffsetsPerTrigger", 5000) \
         .load()
 
     # Parse JSON & Flatten (Included 'op' for delete handling)
