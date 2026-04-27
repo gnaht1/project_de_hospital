@@ -1,7 +1,7 @@
 with enriched_episodes_today as (
     -- 1. Gọi bảng Silver ra và lọc lấy ngày đang test
     select * from {{ ref('int_clinical__enriched_episodes') }}
-    where date_trunc('day', admission_time) = date '2026-01-13'
+    where date_trunc('day', admission_time) = current_date()
 ),
 
 technical_status as (
@@ -34,7 +34,7 @@ technical_status as (
     from {{ ref('stg_hospital_core__ct_dv_ky_thuat') }}
     
     -- Filter by clinical operational time to ensure accuracy
-    where date_trunc('day', coalesce(thoi_gian_lay_so, thoi_gian_tiep_nhan)) = date '2026-01-13'
+    where date_trunc('day', coalesce(thoi_gian_lay_so, thoi_gian_tiep_nhan)) = current_date()
     group by 1
 )
 

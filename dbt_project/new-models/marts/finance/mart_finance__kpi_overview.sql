@@ -38,6 +38,7 @@ monthly_summary as (
 select
     c.metric_date,
     cast(date_trunc('month', c.metric_date) as date) as month_start,
+    date_format(cast(date_trunc('month', c.metric_date) as date), 'yyyy-MM') as stat_month,
     coalesce(d.receipts_today, 0) as receipts_today,
     coalesce(d.gross_receipt_amount_today, 0) as gross_receipt_amount_today,
     coalesce(d.net_receipt_amount_today, 0) as net_receipt_amount_today,
