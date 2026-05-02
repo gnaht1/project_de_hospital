@@ -23,9 +23,9 @@ rate_calculation as (
         
         -- Calculate Re-examination Rate (Avoid division by zero)
         -- Result will be a decimal like 0.325 (which is 32.5%)
-        case 
-            when total_visits > 0 then cast(return_visits as double) / total_visits 
-            else 0 
+        case
+            when total_visits > 0 then cast(return_visits as double) / total_visits
+            else null
         end as current_rate
     from monthly_stats
 ),
@@ -50,3 +50,4 @@ select
     -- Calculate percentage point difference (e.g., +0.021 means +2.1%)
     current_rate - last_month_rate as trend_diff
 from lagged_rates
+where stat_date < date_trunc('month', add_months(current_date, 1))

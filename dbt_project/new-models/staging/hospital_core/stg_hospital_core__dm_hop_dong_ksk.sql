@@ -33,6 +33,7 @@ renamed_and_casted as (
     -- Filter out soft-deleted records early
     where deleted = 0 
       and active = true
+      and lower(ten) not like '%test%'
 )
 
 select * from renamed_and_casted

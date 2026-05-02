@@ -52,7 +52,7 @@ classified_services as (
 
     -- join dịch vụ → lấy nhom_id
     left join stg_dm_dich_vu dmdv
-        on dv.dich_vu_id = dmdv.dich_vu_id
+        on dv.dm_dich_vu_id = dmdv.dich_vu_id
 
     -- join nhóm → lấy tên nhóm
     left join stg_nhom_dich_vu ndv

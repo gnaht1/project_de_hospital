@@ -5,7 +5,12 @@ with source as (
 
 renamed_and_casted as (
     select
+        -- Row-level key of ct_dich_vu (kept for backward compatibility)
+        id as ct_dich_vu_id,
+        -- Legacy alias currently used across downstream models
         id as dich_vu_id,
+        -- FK to dm_dich_vu.id for dimension joins
+        cast(dich_vu_id as int) as dm_dich_vu_id,
         loai_dich_vu as loai_dich_vu_id,
         -- Use indication time for volume tracking
         cast(thoi_gian_chi_dinh as timestamp) as order_time,
