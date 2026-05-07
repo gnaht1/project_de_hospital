@@ -1,7 +1,6 @@
-name: 'hospital_datalake'
+name: 'hospital_dbt'
 version: '1.0.0'
-
-profile: 'hospital_spark'
+profile: 'hospital_dbt'
 
 model-paths: ["models"]
 analysis-paths: ["analyses"]
@@ -10,18 +9,36 @@ seed-paths: ["seeds"]
 macro-paths: ["macros"]
 snapshot-paths: ["snapshots"]
 
-clean-targets:
+clean-targets:         
   - "target"
   - "dbt_packages"
 
 models:
-  hospital_datalake:
-    +materialized: table
-    +file_format: iceberg
-    # All models in models/staging will be saved to the 'staging' database
+  hospital_dbt:
+    # Force dbt to use the Iceberg catalog
+    +database: his_catalog 
+    
+    # 1. Staging Layer (Bronze)
     staging:
-      +schema: staging
-      
-    # All models in models/marts will be saved to the 'marts' database
+      +materialized: ephemeral 
+      +file_format: iceberg
+      +table_properties:
+        'write.format.default': 'parquet'
+      # All models inside staging/ will go to the 'staging_db' folder in MinIO
+      +schema: staging_db
+
+    # 2. Intermediate Layer (Silver)
+    intermediate:
+      +materialized: table
+      +file_format: iceberg 
+      +table_properties:
+        'write.format.default': 'parquet'
+      # All models inside intermediate/ will go to the 'silver_db' folder in MinIO
+      +schema: silver_db
+
+    # 3. Marts Layer (Gold)
     marts:
-      +schema: marts
+      +materialized: table 
+      +file_format: iceberg
+      # All models inside marts/ (core, clinical, finance) will go to the 'gold_db' folder in MinIO
+      +schema: gold_db

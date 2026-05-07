@@ -1,4 +1,4 @@
-import os
+﻿import os
 from config import (
     KAFKA_SERVER, MINIO_URL, ACCESS_KEY, SECRET_KEY,
     BUCKET_NAME, CATALOG_NAME, DATABASE_NAME,
@@ -146,10 +146,10 @@ def start_stream_for_topic(spark, topic, conf):
         finally:
             batch_df.sparkSession.catalog.dropTempView(temp_view_name)
 
-    # Start streaming with longer trigger to allow file merging (Compaction friendly)
+    # Start streaming with 5-minute trigger to reduce commit frequency and help metadata compaction
     query = df_parsed.writeStream \
         .foreachBatch(upsert_to_iceberg) \
-        .trigger(processingTime="1 minute") \
+        .trigger(processingTime="5 minutes") \
         .option("checkpointLocation", f"s3a://{BUCKET_NAME}/checkpoints/{table_name}") \
         .start()
     
