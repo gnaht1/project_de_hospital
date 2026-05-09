@@ -32,10 +32,10 @@ NRT_DBT_SELECTOR = (
 # expire_snapshots se xoa metadata/snapshot cu tren MinIO va chi giu 10 phien ban gan nhat.
 # Neu selector NRT them model moi, bo sung ten bang Iceberg vao danh sach nay.
 NRT_ICEBERG_TABLES = [
-    "db.mart_core__dm_benh_nhan_snapshot",
-    "db.mart_finance__nrt_revenue_receipts",
-    "db.mart_finance__nrt_revenue_today_vs_yesterday",
-    "db.mart_clinical__nrt_specialty_density_hourly",
+    "gold_db.mart_core__dm_benh_nhan_snapshot",
+    "gold_db.mart_finance__nrt_revenue_receipts",
+    "gold_db.mart_finance__nrt_revenue_today_vs_yesterday",
+    "gold_db.mart_clinical__nrt_specialty_density_hourly",
 ]
 
 expire_nrt_snapshot_sql = "\n".join(
@@ -71,7 +71,7 @@ with DAG(
     description='Chay dbt NRT moi 3 phut cho cac chart realtime',
     schedule='*/3 * * * *',
     max_active_runs=1,
-    start_date=datetime(2026, 5, 8),
+    start_date=datetime(2026, 5, 7),
     catchup=False,
     tags=['dbt', 'hospital_lakehouse', 'nrt'],
 ) as dag:
