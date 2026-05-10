@@ -1,0 +1,413 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_HospitalProject_V3" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.16.0" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.20.0">
+  <bpmn:collaboration id="Collaboration_HospitalMain">
+    <bpmn:participant id="Participant_Hospital" name="Hospital Core Process (Advanced)" processRef="Process_Hospital_Unified" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Hospital_Unified" isExecutable="true">
+    <bpmn:laneSet id="LaneSet_Roles">
+      <bpmn:lane id="Lane_Receptionist" name="Receptionist / Admin">
+        <bpmn:flowNodeRef>StartEvent_PatientArrives</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_IsEmergency</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_EmergencyAdmit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_IsNewPatient</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CreatePatientRecord</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SearchPatient</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_HasAppointment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_RegisterWalkIn</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CheckAppointment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_CreateVisitAppt</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_AssignQueue</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Doctor" name="Doctor / Physician">
+        <bpmn:flowNodeRef>Task_ClinicalExam</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_NeedsServices</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_OrderServices</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_FinalConclusion</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Technician" name="Technician (Lab/X-Ray)">
+        <bpmn:flowNodeRef>Task_ExecuteService</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Cashier" name="Cashier / Finance">
+        <bpmn:flowNodeRef>Task_ProcessPayment</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_PatientDischarged</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+
+    <bpmn:startEvent id="StartEvent_PatientArrives" name="Patient Arrives">
+      <bpmn:outgoing>Flow_Start_To_EmergGateway</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:exclusiveGateway id="Gateway_IsEmergency" name="Is Emergency?">
+      <bpmn:incoming>Flow_Start_To_EmergGateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Emerg_Yes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Emerg_No</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="Task_EmergencyAdmit" name="Emergency Admit (ct_dot_dieu_tri: cap_cuu=1)">
+      <bpmn:documentation>Create visit with Emergency Flag. Skip queue.</bpmn:documentation>
+      <bpmn:incoming>Flow_Emerg_Yes</bpmn:incoming>
+      <bpmn:outgoing>Flow_Emerg_To_Exam</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_IsNewPatient" name="New Patient?">
+      <bpmn:incoming>Flow_Emerg_No</bpmn:incoming>
+      <bpmn:outgoing>Flow_NewPatient_Yes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_NewPatient_No</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="Task_CreatePatientRecord" name="Create Patient (dm_benh_nhan)">
+      <bpmn:incoming>Flow_NewPatient_Yes</bpmn:incoming>
+      <bpmn:outgoing>Flow_Create_To_ApptGateway</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_SearchPatient" name="Search Patient (dm_benh_nhan)">
+      <bpmn:incoming>Flow_NewPatient_No</bpmn:incoming>
+      <bpmn:outgoing>Flow_Search_To_ApptGateway</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_HasAppointment" name="Has Appointment?">
+      <bpmn:incoming>Flow_Create_To_ApptGateway</bpmn:incoming>
+      <bpmn:incoming>Flow_Search_To_ApptGateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_Appt_No</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Appt_Yes</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="Task_CheckAppointment" name="Check Schedule (ct_dv_kham_ket_luan)">
+      <bpmn:incoming>Flow_Appt_Yes</bpmn:incoming>
+      <bpmn:outgoing>Flow_Check_To_CreateApptVisit</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_CreateVisitAppt" name="Create Visit Appt (ct_dot_dieu_tri)">
+      <bpmn:incoming>Flow_Check_To_CreateApptVisit</bpmn:incoming>
+      <bpmn:outgoing>Flow_ApptVisit_To_Assign</bpmn:outgoing>
+    </bpmn:userTask>
+
+
+
+    <bpmn:userTask id="Task_RegisterWalkIn" name="Register Walk-in (ct_dot_dieu_tri)">
+      <bpmn:incoming>Flow_Appt_No</bpmn:incoming>
+      <bpmn:outgoing>Flow_WalkIn_To_Assign</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_AssignQueue" name="Assign Queue (ct_dv_kham)">
+      <bpmn:incoming>Flow_WalkIn_To_Assign</bpmn:incoming>
+      <bpmn:incoming>Flow_ApptVisit_To_Assign</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_Exam</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_ClinicalExam" name="Clinical Exam (ct_dv_kham)">
+      <bpmn:incoming>Flow_To_Exam</bpmn:incoming>
+      <bpmn:incoming>Flow_Emerg_To_Exam</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_GatewayServices</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="Gateway_NeedsServices" name="Needs Services?">
+      <bpmn:incoming>Flow_To_GatewayServices</bpmn:incoming>
+      <bpmn:outgoing>Flow_NoServices</bpmn:outgoing>
+      <bpmn:outgoing>Flow_YesServices</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="Task_OrderServices" name="Order Services (ct_bo_chi_dinh)">
+      <bpmn:incoming>Flow_YesServices</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_Execution</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_ExecuteService" name="Execute Service (ct_dv_ky_thuat)">
+      <bpmn:incoming>Flow_To_Execution</bpmn:incoming>
+      <bpmn:outgoing>Flow_Results_To_Conclusion</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_FinalConclusion" name="Conclusion (ct_dv_kham_ket_luan)">
+      <bpmn:incoming>Flow_NoServices</bpmn:incoming>
+      <bpmn:incoming>Flow_Results_To_Conclusion</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_Payment</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_ProcessPayment" name="Payment (ct_phieu_thu)">
+      <bpmn:incoming>Flow_To_Payment</bpmn:incoming>
+      <bpmn:outgoing>Flow_To_End</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:endEvent id="EndEvent_PatientDischarged" name="Patient Discharged">
+      <bpmn:incoming>Flow_To_End</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_Start_To_EmergGateway" sourceRef="StartEvent_PatientArrives" targetRef="Gateway_IsEmergency" />
+    <bpmn:sequenceFlow id="Flow_Emerg_Yes" name="Yes" sourceRef="Gateway_IsEmergency" targetRef="Task_EmergencyAdmit" />
+    <bpmn:sequenceFlow id="Flow_Emerg_No" name="No" sourceRef="Gateway_IsEmergency" targetRef="Gateway_IsNewPatient" />
+    <bpmn:sequenceFlow id="Flow_Emerg_To_Exam" sourceRef="Task_EmergencyAdmit" targetRef="Task_ClinicalExam" />
+
+    <bpmn:sequenceFlow id="Flow_NewPatient_Yes" name="Yes" sourceRef="Gateway_IsNewPatient" targetRef="Task_CreatePatientRecord" />
+    <bpmn:sequenceFlow id="Flow_NewPatient_No" name="No" sourceRef="Gateway_IsNewPatient" targetRef="Task_SearchPatient" />
+    <bpmn:sequenceFlow id="Flow_Create_To_ApptGateway" sourceRef="Task_CreatePatientRecord" targetRef="Gateway_HasAppointment" />
+    <bpmn:sequenceFlow id="Flow_Search_To_ApptGateway" sourceRef="Task_SearchPatient" targetRef="Gateway_HasAppointment" />
+
+    <bpmn:sequenceFlow id="Flow_Appt_Yes" name="Yes" sourceRef="Gateway_HasAppointment" targetRef="Task_CheckAppointment" />
+    <bpmn:sequenceFlow id="Flow_Check_To_CreateApptVisit" sourceRef="Task_CheckAppointment" targetRef="Task_CreateVisitAppt" />
+    <bpmn:sequenceFlow id="Flow_ApptVisit_To_Assign" sourceRef="Task_CreateVisitAppt" targetRef="Task_AssignQueue" />
+
+    <bpmn:sequenceFlow id="Flow_Appt_No" name="No (Walk-in)" sourceRef="Gateway_HasAppointment" targetRef="Task_RegisterWalkIn" />
+    <bpmn:sequenceFlow id="Flow_WalkIn_To_Assign" sourceRef="Task_RegisterWalkIn" targetRef="Task_AssignQueue" />
+
+    <bpmn:sequenceFlow id="Flow_To_Exam" sourceRef="Task_AssignQueue" targetRef="Task_ClinicalExam" />
+    <bpmn:sequenceFlow id="Flow_To_GatewayServices" sourceRef="Task_ClinicalExam" targetRef="Gateway_NeedsServices" />
+    <bpmn:sequenceFlow id="Flow_NoServices" name="No" sourceRef="Gateway_NeedsServices" targetRef="Task_FinalConclusion" />
+    <bpmn:sequenceFlow id="Flow_YesServices" name="Yes" sourceRef="Gateway_NeedsServices" targetRef="Task_OrderServices" />
+    <bpmn:sequenceFlow id="Flow_To_Execution" sourceRef="Task_OrderServices" targetRef="Task_ExecuteService" />
+    <bpmn:sequenceFlow id="Flow_Results_To_Conclusion" sourceRef="Task_ExecuteService" targetRef="Task_FinalConclusion" />
+    <bpmn:sequenceFlow id="Flow_To_Payment" sourceRef="Task_FinalConclusion" targetRef="Task_ProcessPayment" />
+    <bpmn:sequenceFlow id="Flow_To_End" sourceRef="Task_ProcessPayment" targetRef="EndEvent_PatientDischarged" />
+
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_HospitalMain">
+      <bpmndi:BPMNShape id="Participant_Hospital_di" bpmnElement="Participant_Hospital" isHorizontal="true">
+        <dc:Bounds x="129" y="80" width="2050" height="660" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Lane_Receptionist_di" bpmnElement="Lane_Receptionist" isHorizontal="true">
+        <dc:Bounds x="159" y="80" width="2020" height="290" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Doctor_di" bpmnElement="Lane_Doctor" isHorizontal="true">
+        <dc:Bounds x="159" y="370" width="2020" height="150" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Technician_di" bpmnElement="Lane_Technician" isHorizontal="true">
+        <dc:Bounds x="159" y="520" width="2020" height="120" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Cashier_di" bpmnElement="Lane_Cashier" isHorizontal="true">
+        <dc:Bounds x="159" y="640" width="2020" height="100" />
+      </bpmndi:BPMNShape>
+
+      <!-- ===== SHAPES ===== -->
+
+      <bpmndi:BPMNShape id="StartEvent_di" bpmnElement="StartEvent_PatientArrives">
+        <dc:Bounds x="212" y="162" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="195" y="202" width="70" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Gateway_IsEmergency_di" bpmnElement="Gateway_IsEmergency" isMarkerVisible="true">
+        <dc:Bounds x="305" y="155" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="293" y="131" width="75" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_EmergencyAdmit_di" bpmnElement="Task_EmergencyAdmit">
+        <dc:Bounds x="280" y="280" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Gateway_IsNewPatient_di" bpmnElement="Gateway_IsNewPatient" isMarkerVisible="true">
+        <dc:Bounds x="425" y="155" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="417" y="131" width="67" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_CreatePatient_di" bpmnElement="Task_CreatePatientRecord">
+        <dc:Bounds x="530" y="100" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_SearchPatient_di" bpmnElement="Task_SearchPatient">
+        <dc:Bounds x="530" y="210" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Gateway_HasAppointment_di" bpmnElement="Gateway_HasAppointment" isMarkerVisible="true">
+        <dc:Bounds x="695" y="155" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="672" y="131" width="88" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_CheckAppointment_di" bpmnElement="Task_CheckAppointment">
+        <dc:Bounds x="810" y="250" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_CreateVisitAppt_di" bpmnElement="Task_CreateVisitAppt">
+        <dc:Bounds x="960" y="250" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+
+
+      <bpmndi:BPMNShape id="Task_RegisterWalkIn_di" bpmnElement="Task_RegisterWalkIn">
+        <dc:Bounds x="900" y="140" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_AssignQueue_di" bpmnElement="Task_AssignQueue">
+        <dc:Bounds x="1260" y="190" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_ClinicalExam_di" bpmnElement="Task_ClinicalExam">
+        <dc:Bounds x="1260" y="405" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Gateway_NeedsServices_di" bpmnElement="Gateway_NeedsServices" isMarkerVisible="true">
+        <dc:Bounds x="1420" y="420" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1405" y="396" width="80" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_OrderServices_di" bpmnElement="Task_OrderServices">
+        <dc:Bounds x="1530" y="410" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_ExecuteService_di" bpmnElement="Task_ExecuteService">
+        <dc:Bounds x="1530" y="540" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_FinalConclusion_di" bpmnElement="Task_FinalConclusion">
+        <dc:Bounds x="1750" y="410" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_ProcessPayment_di" bpmnElement="Task_ProcessPayment">
+        <dc:Bounds x="1750" y="650" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="EndEvent_di" bpmnElement="EndEvent_PatientDischarged">
+        <dc:Bounds x="1900" y="672" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1878" y="712" width="80" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <!-- ===== EDGES ===== -->
+
+      <!-- Start → IsEmergency: straight horizontal -->
+      <bpmndi:BPMNEdge id="Edge_Start" bpmnElement="Flow_Start_To_EmergGateway">
+        <di:waypoint x="248" y="180" />
+        <di:waypoint x="305" y="180" />
+      </bpmndi:BPMNEdge>
+
+      <!-- IsEmergency Yes → EmergencyAdmit: down then left (L-shape) -->
+      <bpmndi:BPMNEdge id="Edge_Emerg_Yes" bpmnElement="Flow_Emerg_Yes">
+        <di:waypoint x="330" y="205" />
+        <di:waypoint x="330" y="280" />
+        <bpmndi:BPMNLabel><dc:Bounds x="335" y="228" width="18" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <!-- IsEmergency No → IsNewPatient: straight horizontal -->
+      <bpmndi:BPMNEdge id="Edge_Emerg_No" bpmnElement="Flow_Emerg_No">
+        <di:waypoint x="355" y="180" />
+        <di:waypoint x="425" y="180" />
+        <bpmndi:BPMNLabel><dc:Bounds x="383" y="162" width="15" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <!-- EmergencyAdmit → ClinicalExam: long horizontal then down-right -->
+      <bpmndi:BPMNEdge id="Edge_Emerg_Exam" bpmnElement="Flow_Emerg_To_Exam">
+        <di:waypoint x="380" y="320" />
+        <di:waypoint x="1210" y="320" />
+        <di:waypoint x="1210" y="445" />
+        <di:waypoint x="1260" y="445" />
+      </bpmndi:BPMNEdge>
+
+      <!-- IsNewPatient Yes → CreatePatient: up then right (L-shape) -->
+      <bpmndi:BPMNEdge id="Edge_New_Yes" bpmnElement="Flow_NewPatient_Yes">
+        <di:waypoint x="450" y="155" />
+        <di:waypoint x="450" y="140" />
+        <di:waypoint x="530" y="140" />
+        <bpmndi:BPMNLabel><dc:Bounds x="468" y="122" width="18" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <!-- IsNewPatient No → SearchPatient: down then right (L-shape) -->
+      <bpmndi:BPMNEdge id="Edge_New_No" bpmnElement="Flow_NewPatient_No">
+        <di:waypoint x="450" y="205" />
+        <di:waypoint x="450" y="250" />
+        <di:waypoint x="530" y="250" />
+        <bpmndi:BPMNLabel><dc:Bounds x="458" y="253" width="15" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <!-- CreatePatient → HasAppointment: straight right, enter top of gateway -->
+      <bpmndi:BPMNEdge id="Edge_To_ApptGw1" bpmnElement="Flow_Create_To_ApptGateway">
+        <di:waypoint x="630" y="140" />
+        <di:waypoint x="720" y="140" />
+        <di:waypoint x="720" y="155" />
+      </bpmndi:BPMNEdge>
+
+      <!-- SearchPatient → HasAppointment: right then up, enter left-bottom of gateway -->
+      <bpmndi:BPMNEdge id="Edge_To_ApptGw2" bpmnElement="Flow_Search_To_ApptGateway">
+        <di:waypoint x="630" y="250" />
+        <di:waypoint x="670" y="250" />
+        <di:waypoint x="670" y="195" />
+        <di:waypoint x="695" y="185" />
+      </bpmndi:BPMNEdge>
+
+      <!-- HasAppointment Yes → CheckAppointment: down then right (L-shape) -->
+      <bpmndi:BPMNEdge id="Edge_Appt_Yes" bpmnElement="Flow_Appt_Yes">
+        <di:waypoint x="720" y="205" />
+        <di:waypoint x="720" y="290" />
+        <di:waypoint x="810" y="290" />
+        <bpmndi:BPMNLabel><dc:Bounds x="728" y="272" width="18" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <!-- HasAppointment No → RegisterWalkIn: straight horizontal -->
+      <bpmndi:BPMNEdge id="Edge_Appt_No" bpmnElement="Flow_Appt_No">
+        <di:waypoint x="745" y="180" />
+        <di:waypoint x="900" y="180" />
+        <bpmndi:BPMNLabel><dc:Bounds x="780" y="162" width="60" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <!-- RegisterWalkIn → AssignQueue: straight horizontal -->
+      <bpmndi:BPMNEdge id="Edge_Walkin_Assign" bpmnElement="Flow_WalkIn_To_Assign">
+        <di:waypoint x="1000" y="180" />
+        <di:waypoint x="1260" y="200" />
+      </bpmndi:BPMNEdge>
+
+      <!-- CheckAppointment → CreateVisitAppt: straight horizontal -->
+      <bpmndi:BPMNEdge id="Edge_CheckAppt_Create" bpmnElement="Flow_Check_To_CreateApptVisit">
+        <di:waypoint x="910" y="290" />
+        <di:waypoint x="960" y="290" />
+      </bpmndi:BPMNEdge>
+
+      <!-- CreateVisitAppt → AssignQueue: right then up (clean L-shape) -->
+      <bpmndi:BPMNEdge id="Edge_Appt_Assign" bpmnElement="Flow_ApptVisit_To_Assign">
+        <di:waypoint x="1060" y="290" />
+        <di:waypoint x="1290" y="290" />
+        <di:waypoint x="1290" y="270" />
+      </bpmndi:BPMNEdge>
+
+      <!-- AssignQueue → ClinicalExam: straight down -->
+      <bpmndi:BPMNEdge id="Edge_Assign_Exam" bpmnElement="Flow_To_Exam">
+        <di:waypoint x="1310" y="270" />
+        <di:waypoint x="1310" y="405" />
+      </bpmndi:BPMNEdge>
+
+      <!-- ClinicalExam → NeedsServices: straight horizontal -->
+      <bpmndi:BPMNEdge id="Edge_Exam_SvcGw" bpmnElement="Flow_To_GatewayServices">
+        <di:waypoint x="1360" y="445" />
+        <di:waypoint x="1420" y="445" />
+      </bpmndi:BPMNEdge>
+
+      <!-- NeedsServices Yes → OrderServices: straight horizontal -->
+      <bpmndi:BPMNEdge id="Edge_Svc_Yes" bpmnElement="Flow_YesServices">
+        <di:waypoint x="1470" y="445" />
+        <di:waypoint x="1530" y="450" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1485" y="427" width="18" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <!-- NeedsServices No → FinalConclusion: up then long horizontal, enter left at top -->
+      <bpmndi:BPMNEdge id="Edge_Svc_No" bpmnElement="Flow_NoServices">
+        <di:waypoint x="1445" y="420" />
+        <di:waypoint x="1445" y="390" />
+        <di:waypoint x="1800" y="390" />
+        <di:waypoint x="1800" y="410" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1453" y="372" width="15" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+
+      <!-- OrderServices → ExecuteService: straight down -->
+      <bpmndi:BPMNEdge id="Edge_Ord_Exec" bpmnElement="Flow_To_Execution">
+        <di:waypoint x="1580" y="490" />
+        <di:waypoint x="1580" y="540" />
+      </bpmndi:BPMNEdge>
+
+      <!-- ExecuteService → FinalConclusion: right then up (clean L-shape) -->
+      <bpmndi:BPMNEdge id="Edge_Exec_Conc" bpmnElement="Flow_Results_To_Conclusion">
+        <di:waypoint x="1630" y="580" />
+        <di:waypoint x="1750" y="580" />
+        <di:waypoint x="1750" y="490" />
+      </bpmndi:BPMNEdge>
+
+      <!-- FinalConclusion → Payment: straight down -->
+      <bpmndi:BPMNEdge id="Edge_Conc_Pay" bpmnElement="Flow_To_Payment">
+        <di:waypoint x="1800" y="490" />
+        <di:waypoint x="1800" y="650" />
+      </bpmndi:BPMNEdge>
+
+      <!-- Payment → End: straight horizontal -->
+      <bpmndi:BPMNEdge id="Edge_Pay_End" bpmnElement="Flow_To_End">
+        <di:waypoint x="1850" y="690" />
+        <di:waypoint x="1900" y="690" />
+      </bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

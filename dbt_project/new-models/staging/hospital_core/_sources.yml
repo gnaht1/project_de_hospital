@@ -1,0 +1,37 @@
+version: 2
+
+sources:
+  - name: raw_hospital
+    schema: db
+    tables:
+      - name: ct_nguon_nb_iceberg
+      - name: dm_hop_dong_ksk_iceberg
+      - name: ct_dot_dieu_tri_iceberg
+      - name: dm_nguon_nb_iceberg
+      - name: ct_bo_chi_dinh_iceberg
+      - name: dm_quan_huyen_iceberg
+      - name: dm_nhom_dich_vu_cap1_iceberg
+      - name: ct_dv_ky_thuat_iceberg
+      - name: dm_nhom_dich_vu_cap2_iceberg
+      - name: hospital_configs_iceberg
+      - name: ct_kham_suc_khoe_iceberg
+      - name: ct_dv_kham_ket_luan_iceberg
+      - name: ct_address_iceberg
+      - name: ct_dich_vu_iceberg
+      - name: dm_benh_nhan_iceberg
+      - name: dm_nhom_dich_vu_cap3_iceberg
+      - name: dm_hoc_ham_hoc_vi_iceberg
+      - name: dm_loai_dich_vu_iceberg
+      - name: dm_phong_iceberg
+      - name: ct_phieu_thu_iceberg
+      - name: dm_dich_vu_iceberg
+      - name: dm_xa_phuong_iceberg
+      - name: dm_chuyen_khoa_iceberg
+      - name: ct_dv_kham_iceberg
+      - name: dm_nguoi_gioi_thieu_iceberg
+      - name: dm_dv_discount_iceberg
+      - name: dm_khoa_iceberg
+      - name: dm_bo_chi_dinh_iceberg
+      - name: dm_nhan_vien_iceberg
+      - name: dm_tinh_thanh_pho_iceberg
+      - name: dm_doi_tuong_kcb_iceberg

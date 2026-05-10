@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_Pharmacy_Fix" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.16.0" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.20.0">
+  <bpmn:collaboration id="Collaboration_Pharmacy">
+    <bpmn:participant id="Participant_Pharmacy" name="Pharmacy Dispensing Process (No Inventory Table)" processRef="Process_Pharmacy_Fix" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_Pharmacy_Fix" isExecutable="true">
+    <bpmn:laneSet id="LaneSet_Pharmacy">
+      <bpmn:lane id="Lane_Patient" name="Patient (Bệnh nhân)">
+        <bpmn:flowNodeRef>StartEvent_PrescriptionReady</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ReceiveDrugs</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_PharmacyDone</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Pharmacist" name="Pharmacist (Dược sĩ)">
+        <bpmn:flowNodeRef>Task_CheckPaymentStatus</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_IsPaid</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ReviewPrescription</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_PrepareDrugs</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ConfirmDispense</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+
+    <bpmn:startEvent id="StartEvent_PrescriptionReady" name="Prescription Issued (ct_dich_vu)">
+      <bpmn:documentation>Trigger: Records added to ct_dich_vu with loai_dich_vu='Thuốc'.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Start_To_Check</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:serviceTask id="Task_CheckPaymentStatus" name="Check Payment (ct_dich_vu)">
+      <bpmn:documentation>Check 'thanh_toan' status in ct_dich_vu (0=Unpaid, 1=Paid).
+Check 'khong_thu_tien' flag.</bpmn:documentation>
+      <bpmn:incoming>Flow_Start_To_Check</bpmn:incoming>
+      <bpmn:outgoing>Flow_Check_To_Gw</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="Gateway_IsPaid" name="Ready to Dispense?">
+      <bpmn:incoming>Flow_Check_To_Gw</bpmn:incoming>
+      <bpmn:outgoing>Flow_Paid_Yes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Paid_No</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="Task_ReviewPrescription" name="Review Rx (ct_dich_vu)">
+      <bpmn:documentation>Pharmacist reviews drug list.
+Read 'ghi_chu' (Usage instructions) from ct_dich_vu.</bpmn:documentation>
+      <bpmn:incoming>Flow_Paid_Yes</bpmn:incoming>
+      <bpmn:outgoing>Flow_Review_To_Prep</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:manualTask id="Task_PrepareDrugs" name="Physical Pick &amp; Pack">
+      <bpmn:documentation>Pharmacist physically takes drugs from shelf based on dm_dich_vu info.</bpmn:documentation>
+      <bpmn:incoming>Flow_Review_To_Prep</bpmn:incoming>
+      <bpmn:outgoing>Flow_Prep_To_Confirm</bpmn:outgoing>
+    </bpmn:manualTask>
+
+    <bpmn:userTask id="Task_ConfirmDispense" name="Confirm Dispense (ct_dich_vu)">
+      <bpmn:documentation>Update ct_dich_vu:
+1. 'thoi_gian_thuc_hien' = Now.
+2. 'trang_thai' (if available) = Completed.
+(No dm_kho interaction).</bpmn:documentation>
+      <bpmn:incoming>Flow_Prep_To_Confirm</bpmn:incoming>
+      <bpmn:outgoing>Flow_Confirm_To_Receive</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:manualTask id="Task_ReceiveDrugs" name="Patient Receives Drugs">
+      <bpmn:incoming>Flow_Confirm_To_Receive</bpmn:incoming>
+      <bpmn:outgoing>Flow_Receive_To_End</bpmn:outgoing>
+    </bpmn:manualTask>
+
+    <bpmn:endEvent id="EndEvent_PharmacyDone" name="Dispensing Done">
+      <bpmn:incoming>Flow_Receive_To_End</bpmn:incoming>
+      <bpmn:incoming>Flow_Paid_No</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_Start_To_Check" sourceRef="StartEvent_PrescriptionReady" targetRef="Task_CheckPaymentStatus" />
+    <bpmn:sequenceFlow id="Flow_Check_To_Gw" sourceRef="Task_CheckPaymentStatus" targetRef="Gateway_IsPaid" />
+    
+    <bpmn:sequenceFlow id="Flow_Paid_Yes" name="Yes (Paid/Free)" sourceRef="Gateway_IsPaid" targetRef="Task_ReviewPrescription" />
+    <bpmn:sequenceFlow id="Flow_Paid_No" name="No (Unpaid)" sourceRef="Gateway_IsPaid" targetRef="EndEvent_PharmacyDone" />
+    
+    <bpmn:sequenceFlow id="Flow_Review_To_Prep" sourceRef="Task_ReviewPrescription" targetRef="Task_PrepareDrugs" />
+    <bpmn:sequenceFlow id="Flow_Prep_To_Confirm" sourceRef="Task_PrepareDrugs" targetRef="Task_ConfirmDispense" />
+    <bpmn:sequenceFlow id="Flow_Confirm_To_Receive" sourceRef="Task_ConfirmDispense" targetRef="Task_ReceiveDrugs" />
+    <bpmn:sequenceFlow id="Flow_Receive_To_End" sourceRef="Task_ReceiveDrugs" targetRef="EndEvent_PharmacyDone" />
+
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Pharmacy_Fix">
+    <bpmndi:BPMNPlane id="BPMNPlane_Pharmacy_Fix" bpmnElement="Collaboration_Pharmacy">
+      <bpmndi:BPMNShape id="Participant_Pharmacy_di" bpmnElement="Participant_Pharmacy" isHorizontal="true">
+        <dc:Bounds x="129" y="80" width="1000" height="380" />
+      </bpmndi:BPMNShape>
+      
+      <bpmndi:BPMNShape id="Lane_Patient_di" bpmnElement="Lane_Patient" isHorizontal="true">
+        <dc:Bounds x="159" y="80" width="970" height="120" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_Pharmacist_di" bpmnElement="Lane_Pharmacist" isHorizontal="true">
+        <dc:Bounds x="159" y="200" width="970" height="260" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="StartEvent_di" bpmnElement="StartEvent_PrescriptionReady">
+        <dc:Bounds x="212" y="122" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="190" y="85" width="80" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_CheckPay_di" bpmnElement="Task_CheckPaymentStatus">
+        <dc:Bounds x="290" y="290" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Gateway_Paid_di" bpmnElement="Gateway_IsPaid" isMarkerVisible="true">
+        <dc:Bounds x="430" y="305" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="418" y="281" width="75" height="27" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_Review_di" bpmnElement="Task_ReviewPrescription">
+        <dc:Bounds x="530" y="290" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_Prep_di" bpmnElement="Task_PrepareDrugs">
+        <dc:Bounds x="670" y="290" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_Confirm_di" bpmnElement="Task_ConfirmDispense">
+        <dc:Bounds x="810" y="290" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_Receive_di" bpmnElement="Task_ReceiveDrugs">
+        <dc:Bounds x="810" y="100" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="EndEvent_di" bpmnElement="EndEvent_PharmacyDone">
+        <dc:Bounds x="960" y="122" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="941" y="165" width="74" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="Edge_1" bpmnElement="Flow_Start_To_Check"><di:waypoint x="248" y="140" /><di:waypoint x="270" y="140" /><di:waypoint x="270" y="330" /><di:waypoint x="290" y="330" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_2" bpmnElement="Flow_Check_To_Gw"><di:waypoint x="390" y="330" /><di:waypoint x="430" y="330" /></bpmndi:BPMNEdge>
+      
+      <bpmndi:BPMNEdge id="Edge_Yes" bpmnElement="Flow_Paid_Yes"><di:waypoint x="480" y="330" /><di:waypoint x="530" y="330" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_No" bpmnElement="Flow_Paid_No"><di:waypoint x="455" y="355" /><di:waypoint x="455" y="400" /><di:waypoint x="930" y="400" /><di:waypoint x="930" y="140" /><di:waypoint x="960" y="140" /></bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Edge_Rev_Prep" bpmnElement="Flow_Review_To_Prep"><di:waypoint x="630" y="330" /><di:waypoint x="670" y="330" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Prep_Conf" bpmnElement="Flow_Prep_To_Confirm"><di:waypoint x="770" y="330" /><di:waypoint x="810" y="330" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Conf_Rec" bpmnElement="Flow_Confirm_To_Receive"><di:waypoint x="860" y="290" /><di:waypoint x="860" y="180" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_Rec_End" bpmnElement="Flow_Receive_To_End"><di:waypoint x="910" y="140" /><di:waypoint x="960" y="140" /></bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

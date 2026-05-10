@@ -63,16 +63,74 @@ schema_ct_bo_chi_dinh = StructType([
 ])
 
 # Table 5: CT_DICH_VU
+# Table 5: CT_DICH_VU
 schema_ct_dich_vu = StructType([
     StructField("id", IntegerType(), True),
     StructField("nb_dot_dieu_tri_id", IntegerType(), True),
-    StructField("bo_chi_dinh_id", IntegerType(), True),
+    StructField("bac_si_chi_dinh_id", IntegerType(), True),
+    StructField("chi_dinh_tu_dich_vu_id", IntegerType(), True),
+    StructField("chi_dinh_tu_loai_dich_vu", IntegerType(), True),
+    StructField("dich_vu_id", IntegerType(), True),
+    StructField("doi_tuong_kcb", IntegerType(), True),
+    StructField("dung_tuyen", IntegerType(), True),
+    StructField("ghi_chu", StringType(), True),
+    StructField("gia_bao_hiem", DoubleType(), True),
+    StructField("gia_goc", DoubleType(), True),
+    StructField("gia_khong_bao_hiem", DoubleType(), True),
+    StructField("gia_phu_thu", DoubleType(), True),
+    StructField("khoa_chi_dinh_id", IntegerType(), True),
+    StructField("khong_thu_tien", BooleanType(), True),
+    StructField("khong_tinh_tien", BooleanType(), True),
+    StructField("loai_dich_vu", IntegerType(), True),
+    StructField("loai_doi_tuong_id", FloatType(), True),
+    StructField("loai_hinh_thanh_toan_id", StringType(), True),
+    StructField("mien_cung_chi_tra", BooleanType(), True),
+    StructField("muc_huong", StringType(), True),
+    StructField("nb_bo_chi_dinh_id", FloatType(), True),
+    StructField("nb_chuyen_khoa_id", StringType(), True),
+    StructField("nb_goi_dv_chi_tiet_id", StringType(), True),
+    StructField("nb_goi_pt_tt_id", StringType(), True),
+    StructField("nb_the_bao_hiem_id", StringType(), True),
+    StructField("ngoai_vien", BooleanType(), True),
+    StructField("phan_tram_mien_giam_dich_vu_bh", FloatType(), True),
+    StructField("phan_tram_mien_giam_dich_vu_khong_bh", FloatType(), True),
+    StructField("phat_hanh_hoa_don", BooleanType(), True),
+    StructField("phieu_doi_tra_id", StringType(), True),
+    StructField("phieu_thu_id", FloatType(), True),
+    StructField("so_luong", FloatType(), True),
+    StructField("stt_hien_thi", StringType(), True),
+    StructField("thanh_toan", IntegerType(), True), # Để Integer phòng trường hợp là status code (0,1,2)
     StructField("thoi_gian_chi_dinh", StringType(), True),
+    StructField("thoi_gian_thuc_hien", StringType(), True),
+    StructField("tien_bh_thanh_toan", DoubleType(), True),
+    StructField("tien_giam_gia_bh", DoubleType(), True),
+    StructField("tien_giam_gia_khong_bh", DoubleType(), True),
+    StructField("tien_mien_giam_dich_vu_bh", DoubleType(), True),
+    StructField("tien_mien_giam_dich_vu_khong_bh", DoubleType(), True),
+    StructField("tien_mien_giam_dich_vu_nhap_vao", DoubleType(), True),
+    StructField("tien_mien_giam_phieu_thu_bh", DoubleType(), True),
+    StructField("tien_mien_giam_phieu_thu_khong_bh", DoubleType(), True),
+    StructField("tien_nb_cung_chi_tra", DoubleType(), True),
+    StructField("tien_nb_phu_thu", DoubleType(), True),
+    StructField("tien_nb_trai_tuyen", DoubleType(), True),
+    StructField("tien_nb_tu_tra", DoubleType(), True),
+    StructField("tien_nguon_khac", DoubleType(), True),
+    StructField("trang_thai_hoan", IntegerType(), True),
+    StructField("tu_tra", BooleanType(), True),
+    StructField("ty_le_bh_tt", FloatType(), True),
+    StructField("ty_le_tt_dv", FloatType(), True),
+    StructField("dv_gia_id", FloatType(), True),
+    StructField("nb_phac_do_dieu_tri_id", StringType(), True),
+    StructField("phac_do_dieu_tri_dich_vu_id", StringType(), True),
+    StructField("ngoai_vien_id", StringType(), True),
+    StructField("nguon_khac_id", StringType(), True),
     StructField("active", BooleanType(), True),
     StructField("deleted", IntegerType(), True),
     StructField("created_at", TimestampType(), True),
     StructField("updated_at", TimestampType(), True)
 ])
+
+
 
 # Table 6: CT_DOT_DIEU_TRI
 schema_ct_dot_dieu_tri = StructType([
@@ -293,7 +351,7 @@ schema_ct_phieu_thu = StructType([
 # Table 13: DM_BENH_NHAN
 schema_dm_benh_nhan = StructType([
     StructField("nb_thong_tin_id", IntegerType(), True),
-    StructField("ma_nb", IntegerType(), True),
+    StructField("ma_nb", StringType(), True),
     StructField("email", StringType(), True),
     StructField("ngay_sinh", StringType(), True),
     StructField("noi_lam_viec", StringType(), True),
@@ -584,130 +642,161 @@ schema_hospital_configs = StructType([
 
 # --- CONFIG TABLES (IMPORTANT) ---
 # Key: Kafka Topic Name
-# Value: (Iceberg Table Name, Schema)
+# Value: (Iceberg Table Name, Schema, Primary Keys cho MERGE INTO)
 TABLE_CONFIGS = {
     "his.core_his_prod.dm_khoa": {
         "table_name": "dm_khoa_iceberg",
-        "schema": schema_dm_khoa
+        "schema": schema_dm_khoa,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.dm_loai_dich_vu": {
         "table_name": "dm_loai_dich_vu_iceberg",
-        "schema": schema_dm_loai_dich_vu
+        "schema": schema_dm_loai_dich_vu,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.ct_address": {
         "table_name": "ct_address_iceberg",
-        "schema": schema_ct_address
+        "schema": schema_ct_address,
+        "primary_keys": ["nb_dot_dieu_tri_id"]
     },
     "his.core_his_prod.ct_bo_chi_dinh": {
         "table_name": "ct_bo_chi_dinh_iceberg",
-        "schema": schema_ct_bo_chi_dinh
+        "schema": schema_ct_bo_chi_dinh,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.ct_dich_vu": {
         "table_name": "ct_dich_vu_iceberg",
-        "schema": schema_ct_dich_vu
+        "schema": schema_ct_dich_vu,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.ct_dot_dieu_tri": {
         "table_name": "ct_dot_dieu_tri_iceberg",
-        "schema": schema_ct_dot_dieu_tri
+        "schema": schema_ct_dot_dieu_tri,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.ct_dv_kham": {
         "table_name": "ct_dv_kham_iceberg",
-        "schema": schema_ct_dv_kham
+        "schema": schema_ct_dv_kham,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.ct_dv_kham_ket_luan": {
         "table_name": "ct_dv_kham_ket_luan_iceberg",
-        "schema": schema_ct_dv_kham_ket_luan
+        "schema": schema_ct_dv_kham_ket_luan,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.ct_dv_ky_thuat": {
         "table_name": "ct_dv_ky_thuat_iceberg",
-        "schema": schema_ct_dv_ky_thuat
+        "schema": schema_ct_dv_ky_thuat,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.ct_kham_suc_khoe": {
         "table_name": "ct_kham_suc_khoe_iceberg",
-        "schema": schema_ct_kham_suc_khoe
+        "schema": schema_ct_kham_suc_khoe,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.ct_nguon_nb": {
         "table_name": "ct_nguon_nb_iceberg",
-        "schema": schema_ct_nguon_nb
+        "schema": schema_ct_nguon_nb,
+        "primary_keys": ["nb_dot_dieu_tri_id", "nguon_nb_id"] # Dùng Composite Key
     },
     "his.core_his_prod.ct_phieu_thu": {
         "table_name": "ct_phieu_thu_iceberg",
-        "schema": schema_ct_phieu_thu
+        "schema": schema_ct_phieu_thu,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.dm_benh_nhan": {
         "table_name": "dm_benh_nhan_iceberg",
-        "schema": schema_dm_benh_nhan
+        "schema": schema_dm_benh_nhan,
+        "primary_keys": ["nb_thong_tin_id"]
     },
     "his.core_his_prod.dm_bo_chi_dinh": {
         "table_name": "dm_bo_chi_dinh_iceberg",
-        "schema": schema_dm_bo_chi_dinh
+        "schema": schema_dm_bo_chi_dinh,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.dm_chuyen_khoa": {
         "table_name": "dm_chuyen_khoa_iceberg",
-        "schema": schema_dm_chuyen_khoa
+        "schema": schema_dm_chuyen_khoa,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.dm_dich_vu": {
         "table_name": "dm_dich_vu_iceberg",
-        "schema": schema_dm_dich_vu
+        "schema": schema_dm_dich_vu,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.dm_doi_tuong_kcb": {
         "table_name": "dm_doi_tuong_kcb_iceberg",
-        "schema": schema_dm_doi_tuong_kcb
+        "schema": schema_dm_doi_tuong_kcb,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.dm_dv_discount": {
         "table_name": "dm_dv_discount_iceberg",
-        "schema": schema_dm_dv_discount
+        "schema": schema_dm_dv_discount,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.dm_hoc_ham_hoc_vi": {
         "table_name": "dm_hoc_ham_hoc_vi_iceberg",
-        "schema": schema_dm_hoc_ham_hoc_vi
+        "schema": schema_dm_hoc_ham_hoc_vi,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.dm_hop_dong_ksk": {
         "table_name": "dm_hop_dong_ksk_iceberg",
-        "schema": schema_dm_hop_dong_ksk
+        "schema": schema_dm_hop_dong_ksk,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.dm_nguoi_gioi_thieu": {
         "table_name": "dm_nguoi_gioi_thieu_iceberg",
-        "schema": schema_dm_nguoi_gioi_thieu
+        "schema": schema_dm_nguoi_gioi_thieu,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.dm_nguon_nb": {
         "table_name": "dm_nguon_nb_iceberg",
-        "schema": schema_dm_nguon_nb
+        "schema": schema_dm_nguon_nb,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.dm_nhan_vien": {
         "table_name": "dm_nhan_vien_iceberg",
-        "schema": schema_dm_nhan_vien
+        "schema": schema_dm_nhan_vien,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.dm_nhom_dich_vu_cap1": {
         "table_name": "dm_nhom_dich_vu_cap1_iceberg",
-        "schema": schema_dm_nhom_dich_vu_cap1
+        "schema": schema_dm_nhom_dich_vu_cap1,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.dm_nhom_dich_vu_cap2": {
         "table_name": "dm_nhom_dich_vu_cap2_iceberg",
-        "schema": schema_dm_nhom_dich_vu_cap2
+        "schema": schema_dm_nhom_dich_vu_cap2,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.dm_nhom_dich_vu_cap3": {
         "table_name": "dm_nhom_dich_vu_cap3_iceberg",
-        "schema": schema_dm_nhom_dich_vu_cap3
+        "schema": schema_dm_nhom_dich_vu_cap3,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.dm_phong": {
         "table_name": "dm_phong_iceberg",
-        "schema": schema_dm_phong
+        "schema": schema_dm_phong,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.dm_quan_huyen": {
         "table_name": "dm_quan_huyen_iceberg",
-        "schema": schema_dm_quan_huyen
+        "schema": schema_dm_quan_huyen,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.dm_tinh_thanh_pho": {
         "table_name": "dm_tinh_thanh_pho_iceberg",
-        "schema": schema_dm_tinh_thanh_pho
+        "schema": schema_dm_tinh_thanh_pho,
+        "primary_keys": ["id"]
     },
     "his.core_his_prod.dm_xa_phuong": {
         "table_name": "dm_xa_phuong_iceberg",
-        "schema": schema_dm_xa_phuong
+        "schema": schema_dm_xa_phuong,
+        "primary_keys": ["xa_phuong_id"]
     },
     "his.core_his_prod.hospital_configs": {
         "table_name": "hospital_configs_iceberg",
-        "schema": schema_hospital_configs
+        "schema": schema_hospital_configs,
+        "primary_keys": ["id"]
     }
 }
