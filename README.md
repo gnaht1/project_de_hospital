@@ -333,7 +333,7 @@ These documents help connect the technical pipeline to the real business context
 - `.bpmn` files describe operational workflows and business processes in the hospital or clinic environment
 
 <p align="center">
-  <img src="./readme_pic/bpmn.svg" alt="bpmn"
+  <img src="./readme_pic/bpmn.png" alt="bpmn"
   <b>Figure 6:</b> Business process diagram example <br>
 </p>
 
