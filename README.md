@@ -1,5 +1,7 @@
 # Hospital Data Lakehouse Platform
 
+*You can access the Vietnamese version [here](./readme_vn.md)*.
+
 Real-time CDC ingestion, Iceberg-based lakehouse storage, near real-time transformation with dbt, and BI dashboards served through Spark Thrift Server and Apache Superset.
 
 ## Table of Contents
@@ -41,7 +43,7 @@ Real-time CDC ingestion, Iceberg-based lakehouse storage, near real-time transfo
 
 This project is designed for a clinic or hospital environment where operational systems generate continuous transactional data from patient registration, admissions, consultations, billing, laboratory services, and other care-related workflows.
 
-In this kind of healthcare setting, data is usually stored first inside core operational applications such as a `Hospital Information System (HIS)`. This system are optimized for daily operations, not for historical analytics, cross-department reporting, or near real-time monitoring.
+In this kind of healthcare setting, data is usually stored first inside core operational applications such as a `Hospital Information System (HIS)`. This system are optimized for daily operations, historical analytics, cross-department reporting, or near real-time monitoring.
 
 The platform in this repository provides a way to move that operational data into a centralized lakehouse so the clinic can support:
 
@@ -95,14 +97,14 @@ The system separates responsibilities across ingestion, storage, transformation,
 #### 2.3 End-to-End Data Flow
 
 1. Changes in the hospital core system are captured through CDC.
-2. Debezium publishes those changes into Kafka topics.
-3. Spark Structured Streaming runs continuously and reads from Kafka.
-4. Spark parses CDC envelopes, keeps technical columns such as `op` and `ts_ms`, and merges records into raw Iceberg tables on MinIO.
-5. PostgreSQL tracks Iceberg metadata such as table locations, manifests, and snapshots.
-6. dbt builds curated staging and mart layers, including dimension and fact tables.
-7. Spark Thrift Server exposes curated data for SQL access.
-8. Superset queries the curated tables for dashboards and reporting.
-9. Airflow and Crontab schedule refresh, orchestration, and maintenance tasks.
+2. **Debezium** publishes those changes into Kafka topics.
+3. **Spark Structured Streaming** runs continuously and reads from Kafka.
+4. **Spark** parses CDC envelopes, keeps technical columns such as `op` and `ts_ms`, and merges records into raw Iceberg tables on MinIO.
+5. **PostgreSQL** tracks Iceberg metadata such as table locations, manifests, and snapshots.
+6. **dbt** builds curated staging and mart layers, including dimension and fact tables.
+7. **Spark Thrift Server** exposes curated data for SQL access.
+8. **Superset** queries the curated tables for dashboards and reporting.
+9. **Airflow** and **Crontab** schedule refresh, orchestration, and maintenance tasks.
 
 #### 2.4 Ingestion Layer
 
@@ -141,7 +143,7 @@ After reading the events, Spark writes the data into the `Iceberg` table layer, 
   <b>Figure 2:</b> Parquet files in Iceberg format<br>
 </p>
 
-##### 2.5.3 Why Apache Iceberg
+##### 2.5.3 Why Apache Iceberg?
 
 Apache Iceberg is a central design choice because plain CSV, JSON, or text files do not scale well for CDC-driven analytics.
 
