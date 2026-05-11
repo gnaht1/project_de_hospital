@@ -41,7 +41,7 @@ Real-time CDC ingestion, Iceberg-based lakehouse storage, near real-time transfo
 
 This project is designed for a clinic or hospital environment where operational systems generate continuous transactional data from patient registration, admissions, consultations, billing, laboratory services, and other care-related workflows.
 
-In this kind of healthcare setting, data is usually stored first inside core operational applications such as a `Hospital Information System (HIS)`, electronic medical record modules, or department-level service systems. These systems are optimized for daily operations, not for historical analytics, cross-department reporting, or near real-time monitoring.
+In this kind of healthcare setting, data is usually stored first inside core operational applications such as a `Hospital Information System (HIS)`. This system are optimized for daily operations, not for historical analytics, cross-department reporting, or near real-time monitoring.
 
 The platform in this repository provides a way to move that operational data into a centralized lakehouse so the clinic can support:
 
@@ -122,7 +122,7 @@ The captured changes are pushed into `Kafka` topics, which act as the event stre
 
 The streaming job runs continuously, consumes CDC events from Kafka, parses the message structure, preserves technical CDC fields, and prepares records for the raw lakehouse layer.
 
-Spark is the chosen streaming engine for this project. Based on the project decision in `Project management/Mid-game.md`, Spark Structured Streaming already fulfills the streaming requirement, so Flink is not required unless it becomes a mandatory external requirement.
+Spark is the chosen streaming engine for this project. Based on the project decision, Spark Structured Streaming already fulfills the streaming requirement, so Flink is not required unless it becomes a mandatory external requirement.
 
 #### 2.5 Storage and Lakehouse Layer
 
