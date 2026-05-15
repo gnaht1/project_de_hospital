@@ -1,361 +1,322 @@
-# Data Lakehouse Platform Bệnh Viện
+# Data Lakehouse Platform Cho Bệnh Viện
 
-Nạp dữ liệu CDC thời gian thực, lưu trữ lakehouse dựa trên Iceberg, biến đổi gần thời gian thực với dbt, và dashboard BI được phục vụ thông qua Spark Thrift Server và Apache Superset.
+<!-- *English version: [README.md](./README.md).*
+
+Nền tảng này xây dựng một pipeline dữ liệu bệnh viện theo kiến trúc lakehouse, đưa dữ liệu giao dịch từ hệ thống HIS vào môi trường phân tích gần thời gian thực. Thiết kế tập trung vào 4 yếu tố cốt lõi: **chính xác**, **nhanh chóng**, **ổn định** và **bảo mật**. -->
+
+Pipeline chính:
+
+`Core HIS -> Debezium -> Kafka -> Spark Structured Streaming -> Apache Iceberg on MinIO -> dbt -> Spark Thrift Server -> Apache Superset`
 
 ## Mục Lục
 
-- [1. Bối cảnh](#1-bối-cảnh)
-- [2. Triển khai](#2-triển-khai)
-  - [Mô tả các bước triển khai](#mô-tả-các-bước-triển-khai)
-    - [Tổng quan Input/Output](#tổng-quan-inputoutput)
-    - [2.1 Tổng quan dự án](#21-tổng-quan-dự-án)
-    - [2.2 Tổng quan kiến trúc](#22-tổng-quan-kiến-trúc)
-    - [2.3 Luồng dữ liệu đầu-cuối](#23-luồng-dữ-liệu-đầu-cuối)
-    - [2.4 Lớp ingest dữ liệu](#24-lớp-ingest-dữ-liệu)
-      - [2.4.1 Core HIS là hệ thống nguồn](#241-core-his-là-hệ-thống-nguồn)
-      - [2.4.2 Debezium CDC ghi nhận thay đổi dữ liệu](#242-debezium-cdc-ghi-nhận-thay-đổi-dữ-liệu)
-      - [2.4.3 Kafka nhận các sự kiện CDC](#243-kafka-nhận-các-sự-kiện-cdc)
-      - [2.4.4 Spark Structured Streaming đọc dữ liệu từ Kafka](#244-spark-structured-streaming-đọc-dữ-liệu-từ-kafka)
-    - [2.5 Lớp lưu trữ và lakehouse](#25-lớp-lưu-trữ-và-lakehouse)
-      - [2.5.1 Spark ghi vào lớp lưu trữ Iceberg](#251-spark-ghi-vào-lớp-lưu-trữ-iceberg)
-      - [2.5.2 Bronze Silver và Gold định nghĩa các tầng lưu trữ](#252-bronze-silver-và-gold-định-nghĩa-các-tầng-lưu-trữ)
-      - [2.5.3 Vì sao chọn Apache Iceberg](#253-vì-sao-chọn-apache-iceberg)
-      - [2.5.4 MinIO lưu trữ các tệp dữ liệu vật lý](#254-minio-lưu-trữ-các-tệp-dữ-liệu-vật-lý)
-      - [2.5.5 PostgreSQL quản lý metadata Iceberg](#255-postgresql-quản-lý-metadata-iceberg)
-    - [2.6 Biến đổi dữ liệu với dbt](#26-biến-đổi-dữ-liệu-với-dbt)
-    - [2.7 Dashboard và các bài toán phân tích](#27-dashboard-và-các-bài-toán-phân-tích)
-    - [2.8 Lớp query và BI](#28-lớp-query-và-bi)
-      - [2.8.1 Spark Thrift Server cung cấp lớp query](#281-spark-thrift-server-cung-cấp-lớp-query)
-      - [2.8.2 Superset cung cấp lớp trực quan hóa](#282-superset-cung-cấp-lớp-trực-quan-hóa)
-    - [2.9 Điều phối và vận hành bảo trì](#29-điều-phối-và-vận-hành-bảo-trì)
-    - [2.10 Ghi chú triển khai](#210-ghi-chú-triển-khai)
-- [3. Kỹ năng và thành tựu sau khi hoàn thành dự án](#3-kỹ-năng-và-thành-tựu-sau-khi-hoàn-thành-dự-án)
-  - [3.1 Kỹ năng kỹ thuật](#31-kỹ-năng-kỹ-thuật)
-  - [3.2 Kỹ năng công cụ](#32-kỹ-năng-công-cụ)
-  - [3.3 Kiến thức domain](#33-kiến-thức-domain)
-  - [3.4 Tài liệu hóa quy trình nghiệp vụ và dữ liệu](#34-tài-liệu-hóa-quy-trình-nghiệp-vụ-và-dữ-liệu)
-- [4. Định hướng phát triển](#4-định-hướng-phát-triển)
-- [Tổng kết](#tổng-kết)
+- [1. Mục Tiêu](#1-mục-tiêu)
+- [2. Bốn Giá Trị Kỹ Thuật](#2-bốn-giá-trị-kỹ-thuật)
+  - [2.1 Chính Xác](#21-chính-xác)
+  - [2.2 Nhanh Chóng](#22-nhanh-chóng)
+  - [2.3 Ổn Định](#23-ổn-định)
+  - [2.4 Bảo Mật](#24-bảo-mật)
+- [3. Kiến Trúc Tổng Quan](#3-kiến-trúc-tổng-quan)
+- [4. Luồng Dữ Liệu Đầu Cuối](#4-luồng-dữ-liệu-đầu-cuối)
+- [5. Thiết Kế Theo Từng Lớp](#5-thiết-kế-theo-từng-lớp)
+  - [5.1 Input, Processing Và Output](#51-input-processing-và-output)
+  - [5.2 Bronze, Silver Và Gold](#52-bronze-silver-và-gold)
+  - [5.3 Vì Sao Dùng Apache Iceberg](#53-vì-sao-dùng-apache-iceberg)
+  - [5.4 Vai Trò Của PostgreSQL Catalog](#54-vai-trò-của-postgresql-catalog)
+  - [5.5 dbt Transformation](#55-dbt-transformation)
+- [6. Dashboard Và Phân Tích](#6-dashboard-và-phân-tích)
+- [7. Vận Hành Và Bảo Trì](#7-vận-hành-và-bảo-trì)
+  - [7.1 Airflow](#71-airflow)
+  - [7.2 Maintenance Iceberg Và MinIO](#72-maintenance-iceberg-và-minio)
+  - [7.3 Triển Khai Trên VPS](#73-triển-khai-trên-vps)
+- [8. Tài Liệu Nghiệp Vụ](#8-tài-liệu-nghiệp-vụ)
+- [9. Kỹ Năng Đạt Được](#9-kỹ-năng-đạt-được)
+  - [9.1 Kỹ Năng Kỹ Thuật](#91-kỹ-năng-kỹ-thuật)
+  - [9.2 Kỹ Năng Công Cụ](#92-kỹ-năng-công-cụ)
+  - [9.3 Kiến Thức Domain](#93-kiến-thức-domain)
+- [10. Định Hướng Phát Triển](#10-định-hướng-phát-triển)
+- [Tổng Kết](#tổng-kết)
 
-## 1. Bối cảnh
+## 1. Mục Tiêu
 
-Dự án này được thiết kế cho môi trường phòng khám hoặc bệnh viện, nơi các hệ thống vận hành phát sinh dữ liệu giao dịch liên tục từ đăng ký bệnh nhân, nhập viện, khám bệnh, thanh toán, xét nghiệm và các quy trình chăm sóc liên quan khác.
+Dữ liệu bệnh viện phát sinh liên tục từ đăng ký bệnh nhân, khám bệnh, chỉ định dịch vụ, cận lâm sàng, thanh toán, cấp phát thuốc và các hoạt động vận hành khác. Các hệ thống HIS thường tối ưu cho giao dịch hằng ngày, không phải cho báo cáo liên phòng ban, phân tích lịch sử hoặc dashboard gần thời gian thực.
 
-Trong bối cảnh y tế như vậy, dữ liệu thường được lưu trữ trước tiên trong các ứng dụng vận hành cốt lõi như `Hospital Information System (HIS)`. Hệ thống này được tối ưu cho vận hành hằng ngày, phân tích lịch sử, báo cáo liên phòng ban, và giám sát gần thời gian thực.
+Dự án này tạo ra một nền tảng phân tích tập trung để:
 
-Platform trong repository này cung cấp một cách để đưa dữ liệu vận hành đó vào một lakehouse tập trung, giúp phòng khám hỗ trợ:
+- Theo dõi hoạt động bệnh viện gần thời gian thực.
+- Chuẩn hóa dữ liệu nguồn thành các bảng phân tích đáng tin cậy.
+- Phục vụ dashboard cho ban giám đốc, khoa phòng, kế toán, nhân sự và dược.
+- Lưu lịch sử thay đổi dữ liệu theo snapshot để hỗ trợ kiểm tra, đối soát và mở rộng phân tích.
+- Tạo nền tảng cho machine learning, AI hoặc chatbot nghiệp vụ trong tương lai.
 
-- giám sát gần thời gian thực các hoạt động bệnh nhân và dịch vụ
-- báo cáo quản trị xuyên suốt giữa các phòng ban và theo các mốc thời gian
-- phân tích lịch sử đáng tin cậy cho kiểm toán và đánh giá vận hành
-- các bài toán khoa học dữ liệu, machine learning, hoặc AI trong tương lai trên dữ liệu y tế đã được chuẩn hóa
+## 2. Bốn Giá Trị Kỹ Thuật
 
-Mục tiêu tổng thể là cung cấp cho tổ chức một nền tảng phân tích có khả năng mở rộng mà không làm gián đoạn các hệ thống nguồn mà nhân viên đang dùng cho công việc lâm sàng và hành chính hằng ngày.
+### 2.1 Chính Xác
 
-## 2. Triển khai
+Hệ thống ưu tiên tính đúng của dữ liệu từ lúc phát sinh ở HIS đến lúc xuất hiện trên dashboard.
+
+- `Debezium` ghi nhận thay đổi bằng CDC, bao gồm insert, update và delete, thay vì phụ thuộc vào batch export thủ công.
+- `Spark Structured Streaming` giữ lại các trường kỹ thuật như `op` và `ts_ms` để downstream biết bản ghi là tạo mới, cập nhật hay xóa.
+- `MERGE INTO` trên `Apache Iceberg` giúp cập nhật đúng trạng thái mới nhất của từng bản ghi theo khóa chính.
+- Logic deduplicate trong micro-batch dùng bản ghi mới nhất theo `ts_ms`, hạn chế sai lệch khi cùng một khóa có nhiều thay đổi trong thời gian ngắn.
+- `dbt` tách rõ các lớp staging, intermediate và mart để biến đổi dữ liệu có kiểm soát, dễ đọc, dễ kiểm tra và dễ mở rộng.
+- Iceberg snapshot cho phép truy vấn lại phiên bản cũ khi cần đối soát hoặc phục hồi sau lỗi biến đổi.
+
+### 2.2 Nhanh Chóng
+
+Hệ thống được thiết kế để đưa dữ liệu mới từ HIS lên lớp phân tích với độ trễ thấp nhưng vẫn kiểm soát được tài nguyên.
+
+- CDC đẩy thay đổi vào `Kafka` liên tục, không cần chờ export toàn bảng.
+- Spark Streaming đọc Kafka 24/7 và ghi vào Bronze theo micro-batch.
+- Trigger ingest được thiết kế quanh chu kỳ ngắn, ví dụ 1 phút cho lớp raw.
+- Dashboard near real-time dùng bảng Gold vật lý được dbt cập nhật incremental.
+- Airflow có DAG riêng cho luồng NRT, chạy theo chu kỳ 3 phút với `schedule_interval='*/3 * * * *'`.
+- Superset đọc trực tiếp từ bảng Gold đã làm sạch qua Spark Thrift Server, có thể cấu hình auto refresh 1-5 phút cho dashboard vận hành.
+
+### 2.3 Ổn Định
+
+Pipeline được tách lớp rõ ràng để mỗi thành phần làm đúng vai trò, tránh chồng chéo và giảm rủi ro khi vận hành trên VPS tài nguyên vừa phải.
+
+- Spark Streaming chỉ chịu trách nhiệm ingest liên tục từ Kafka vào Iceberg, không bị Airflow khởi động lại theo lịch.
+- Airflow chỉ điều phối dbt và tác vụ bảo trì, giúp workflow dễ quan sát và dễ retry.
+- `max_active_runs=1` ngăn các lần chạy dbt chồng lên nhau.
+- `catchup=False` tránh chạy bù hàng loạt sau downtime, giảm nguy cơ tràn RAM hoặc nghẽn server.
+- Iceberg hỗ trợ ACID transaction, giúp dashboard không đọc phải trạng thái nửa ghi nửa chưa ghi.
+- Các tác vụ `rewrite_data_files`, `rewrite_manifests` và `expire_snapshots` kiểm soát small files, metadata và dung lượng lưu trữ.
+- Các service dài hạn như Spark job, Spark Thrift Server, Airflow và Superset có thể chạy bằng `systemd`, `tmux` hoặc `nohup` tùy môi trường.
+
+### 2.4 Bảo Mật
+
+Thiết kế bảo mật tập trung vào tách trách nhiệm dữ liệu, kiểm soát truy cập và giảm phạm vi phơi bày dữ liệu y tế.
+
+- Dữ liệu nghiệp vụ nằm trong MinIO dưới dạng Parquet/Iceberg; PostgreSQL catalog chỉ lưu metadata, không lưu dữ liệu y tế gốc.
+- Dashboard Superset được phân quyền theo vai trò, ví dụ ban giám đốc, trưởng khoa, kế toán, nhân sự và dược.
+- Người dùng cuối truy cập qua dashboard hoặc SQL serving layer, không truy cập trực tiếp vào hệ thống HIS vận hành.
+- Các khóa truy cập MinIO, PostgreSQL và service account được tách khỏi logic model, giúp dễ quản lý bằng biến môi trường hoặc file cấu hình riêng.
+- Kiến trúc lakehouse tách workload phân tích khỏi database nguồn, giảm rủi ro dashboard hoặc truy vấn nặng ảnh hưởng hệ thống vận hành bệnh viện.
+- Iceberg snapshot và metadata catalog giúp kiểm soát lịch sử thay đổi, hỗ trợ truy vết khi cần kiểm tra dữ liệu.
+
+## 3. Kiến Trúc Tổng Quan
+
 <p align="center">
   <img src="./readme_pic/de_flowchart.jpg" alt="Flow Chart"/>
-  <b>Figure 1:</b> Flow chart <br>
+  <br>
+  <b>Figure 1:</b> Flow chart
 </p>
 
-### Mô tả các steps triển khai
+Hệ thống gồm các thành phần chính:
 
-#### Tổng quan Input/Output
+- `Core HIS`: hệ thống nguồn phát sinh dữ liệu bệnh viện.
+- `Debezium`: bắt CDC từ database nguồn.
+- `Kafka`: vận chuyển sự kiện thay đổi dữ liệu.
+- `Spark Structured Streaming`: đọc Kafka và ghi dữ liệu raw vào Iceberg.
+- `MinIO`: object storage chứa file Parquet vật lý.
+- `Apache Iceberg`: table format hỗ trợ ACID, snapshot, merge, delete và schema evolution.
+- `PostgreSQL JDBC Catalog`: lưu metadata Iceberg như bảng, manifest, snapshot và vị trí file.
+- `dbt`: biến đổi dữ liệu từ raw thành staging, intermediate và mart.
+- `Airflow` và `Crontab`: điều phối job transform và bảo trì.
+- `Spark Thrift Server`: cung cấp cổng SQL cho BI tool.
+- `Superset`: dashboard, chart và phân quyền người dùng.
 
-- `Input`: dữ liệu giao dịch từ `HIS` cốt lõi của phòng khám, bao gồm các bản ghi vận hành như đăng ký, lượt khám, dịch vụ, thanh toán và các hoạt động y tế hằng ngày khác.
-  - Link **mô tả dữ liệu**: [Link](https://docs.google.com/spreadsheets/d/1eGdW56kQfhWlkBmLUB7z0Jgh5vEu-bKBL0QVoc3e2bI/edit?usp=sharing)
-- `Processing`: ghi nhận CDC với `Debezium`, streaming sự kiện qua `Kafka`, ingest với `Spark Structured Streaming`, lưu trữ trong `Iceberg` trên `MinIO`, biến đổi với `dbt`, và điều phối bằng `Airflow` và `Crontab`.
-- `Output`: các dataset `Bronze`, `Silver`, `Gold` đã được chuẩn hóa, các bảng phân tích có thể truy vấn bằng SQL thông qua `Spark Thrift Server`, và dashboard phân quyền theo vai trò trong `Superset` cho từng nhóm người dùng.
+## 4. Luồng Dữ Liệu Đầu Cuối
 
-Quá trình triển khai đi theo flowchart như một pipeline theo từng lớp, bắt đầu từ hệ thống vận hành của phòng khám, đi qua ingest streaming và lưu trữ lakehouse, sau đó kết thúc ở các bước biến đổi, phục vụ SQL, trực quan hóa và bảo trì.
+1. Dữ liệu phát sinh trong Core HIS khi có đăng ký, lượt khám, dịch vụ, thanh toán hoặc thao tác vận hành.
+2. Debezium đọc thay đổi từ database nguồn và publish sự kiện CDC vào Kafka topic.
+3. Spark Structured Streaming consume Kafka, parse CDC envelope và chuẩn hóa các cột kỹ thuật.
+4. Spark ghi dữ liệu vào bảng Iceberg trên MinIO bằng cơ chế upsert/delete theo khóa chính.
+5. PostgreSQL catalog ghi nhận metadata của bảng Iceberg, snapshot và file liên quan.
+6. dbt đọc dữ liệu raw qua Spark, xây dựng staging, intermediate và mart.
+7. Airflow điều phối dbt theo lịch batch hoặc near real-time.
+8. Spark Thrift Server mở lớp SQL để Superset truy vấn dữ liệu đã chuẩn hóa.
+9. Superset hiển thị dashboard theo vai trò người dùng.
 
-#### 2.1 Tổng quan dự án
+## 5. Thiết Kế Theo Từng Lớp
 
-Dự án này là một nền tảng data engineering cho bệnh viện được xây dựng trên kiến trúc lakehouse. Mục tiêu của nó là đưa dữ liệu từ các hệ thống vận hành của bệnh viện vào một môi trường sẵn sàng cho phân tích, hỗ trợ dashboard vận hành gần thời gian thực, mô hình dimension và fact cho báo cáo, theo dõi lịch sử đáng tin cậy thông qua Iceberg snapshots, và mở rộng cho các bài toán machine learning hoặc AI trong tương lai.
+### 5.1 Input, Processing Và Output
 
-Pipeline thực tế là:
+- `Input`: dữ liệu giao dịch từ HIS, bao gồm bệnh nhân, lượt khám, dịch vụ, thanh toán, khoa phòng, nhân viên, thuốc và các hoạt động nghiệp vụ liên quan.
+- `Processing`: Debezium CDC, Kafka streaming, Spark Structured Streaming, Iceberg table format, dbt transformation, Airflow orchestration.
+- `Output`: bảng Bronze, Silver, Gold; mart nghiệp vụ; dashboard Superset; lớp truy vấn SQL qua Spark Thrift Server.
 
-`Core HIS -> Debezium -> Kafka -> Spark Structured Streaming -> Iceberg on MinIO -> dbt -> Spark Thrift Server -> Superset`
+Tài liệu mô tả dữ liệu: [Google Sheet](https://docs.google.com/spreadsheets/d/1eGdW56kQfhWlkBmLUB7z0Jgh5vEu-bKBL0QVoc3e2bI/edit?usp=sharing).
 
-#### 2.2 Tổng quan kiến trúc
+### 5.2 Bronze, Silver Và Gold
 
-Hệ thống tách riêng trách nhiệm giữa các thành phần ingest, lưu trữ, biến đổi, điều phối và trực quan hóa:
-
-- `Debezium` ghi nhận các sự kiện CDC từ cơ sở dữ liệu nguồn của bệnh viện.
-- `Kafka` vận chuyển các thay đổi bảng dữ liệu dưới dạng sự kiện streaming.
-- `Spark Structured Streaming` đọc Kafka liên tục và ghi dữ liệu raw vào các bảng Iceberg.
-- `MinIO` lưu trữ các tệp dữ liệu vật lý.
-- `Apache Iceberg` cung cấp table format, snapshots và hành vi ACID.
-- `PostgreSQL` đóng vai trò JDBC catalog cho Iceberg và chỉ lưu metadata.
-- `dbt` biến đổi các bảng raw thành các model staging, dimension và fact đã được chuẩn hóa.
-- `Airflow` và `Crontab` lên lịch cho công việc transform và bảo trì.
-- `Spark Thrift Server` cung cấp quyền truy cập vào hệ thống lakehouse thông qua SQL.
-- `Superset` cung cấp dashboard và khả năng phân tích cho người dùng cuối.
-
-#### 2.3 End-to-End Data Flow
-
-1. Các thay đổi trong hệ thống cốt lõi của bệnh viện được ghi nhận thông qua CDC.
-2. **Debezium** đẩy những thay đổi đó vào các topic Kafka.
-3. **Spark Structured Streaming** chạy liên tục và đọc dữ liệu từ Kafka.
-4. **Spark** phân tích CDC envelope, giữ lại các cột kỹ thuật như `op` và `ts_ms`, sau đó merge bản ghi vào các bảng raw Iceberg trên MinIO.
-5. **PostgreSQL** theo dõi metadata Iceberg như vị trí bảng, manifest và snapshots.
-6. **dbt** xây dựng các tầng staging và mart đã được chuẩn hóa, bao gồm bảng dimension và fact.
-7. **Spark Thrift Server** cung cấp dữ liệu đã được xử lý (curated data) để truy cập bằng SQL.
-8. **Superset** truy vấn các bảng đã chuẩn hóa để phục vụ dashboard và báo cáo.
-9. **Airflow** và **Crontab** lên lịch refresh, điều phối và bảo trì pipeline.
-
-#### 2.4 Lớp ingest dữ liệu
-
-##### 2.4.1 Core HIS là Source System
-
-Quy trình bắt đầu từ `HIS` cốt lõi của phòng khám, nơi lưu trữ dữ liệu giao dịch được tạo ra từ các hoạt động hằng ngày như đăng ký, lượt khám, dịch vụ, thanh toán và vận hành lâm sàng.
-
-##### 2.4.2 Debezium CDC ghi nhận thay đổi dữ liệu
-
-`Debezium` lắng nghe cơ sở dữ liệu nguồn và ghi nhận insert, update và delete thành các sự kiện thay đổi, cho phép dữ liệu di chuyển liên tục mà không cần trích xuất lại toàn bộ bảng nhiều lần.
-
-##### 2.4.3 Kafka nhận các sự kiện CDC
-
-Các thay đổi đã được ghi nhận sẽ được đẩy vào các topic `Kafka`, đóng vai trò là lớp streaming sự kiện giữa hệ thống nguồn và xử lý downstream.
-
-##### 2.4.4 Spark Structured Streaming đọc dữ liệu từ Kafka
-
-Job streaming chạy liên tục, consume các sự kiện CDC từ Kafka, phân tích cấu trúc message, giữ lại các trường CDC kỹ thuật, và chuẩn bị bản ghi cho lớp raw trong lakehouse.
-
-Spark là công cụ streaming được lựa chọn cho dự án này. Theo quyết định của dự án, Spark Structured Streaming đã đáp ứng được yêu cầu streaming, vì vậy Flink không cần thiết trừ khi trở thành một yêu cầu bắt buộc từ bên ngoài.
-
-#### 2.5 Lớp lưu trữ và lakehouse
-
-##### 2.5.1 Spark ghi vào lớp lưu trữ Iceberg
-
-Sau khi đọc sự kiện, Spark ghi dữ liệu vào lớp bảng `Iceberg`, được tổ chức thành các tầng `Bronze`, `Silver` và `Gold`.
-
-##### 2.5.2 Bronze, Silver và Gold định nghĩa các tầng lưu trữ dữ liệu
-
-- `Bronze`: lưu dữ liệu CDC raw vừa ingest.
-- `Silver`: lưu dữ liệu đã được làm sạch, chuẩn hóa và tinh chỉnh một phần.
-- `Gold`: lưu các dataset sẵn sàng cho nghiệp vụ, phục vụ phân tích, báo cáo và dashboard.
+- `Bronze`: lưu dữ liệu CDC raw từ Kafka, giữ các thông tin kỹ thuật như `op`, `ts_ms` và thời điểm ingest.
+- `Silver`: làm sạch, chuẩn hóa kiểu dữ liệu, chuẩn hóa khóa và loại bỏ nhiễu cơ bản.
+- `Gold`: bảng phân tích sẵn sàng cho dashboard, KPI và báo cáo nghiệp vụ.
 
 <p align="center">
-  <img src="./readme_pic/iceberg.png" alt="iceberg"/>
-  <b>Figure 2:</b> Parquet files in Iceberg format<br>
+  <img src="./readme_pic/iceberg.png" alt="Iceberg files"/>
+  <br>
+  <b>Figure 2:</b> Parquet files in Iceberg format
 </p>
 
-##### 2.5.3 Vì sao chọn Apache Iceberg?
+### 5.3 Vì Sao Dùng Apache Iceberg
 
-Apache Iceberg là lựa chọn thiết kế trung tâm vì các tệp CSV, JSON hoặc text thông thường không mở rộng tốt cho bài toán phân tích dựa trên CDC.
+Iceberg là thành phần trung tâm vì pipeline CDC cần nhiều hơn việc ghi file CSV, JSON hoặc Parquet rời rạc.
 
-Các lợi ích chính gồm:
+- `ACID transactions`: đọc ghi an toàn, tránh dashboard đọc trạng thái chưa commit.
+- `MERGE INTO`: hỗ trợ upsert và delete từ sự kiện CDC.
+- `Time travel`: xem lại dữ liệu theo snapshot hoặc thời điểm.
+- `Schema evolution`: thay đổi schema có kiểm soát khi hệ thống nguồn phát triển.
+- `Metadata pruning`: Spark có thể bỏ qua file không liên quan, tăng tốc truy vấn.
+- `Compaction`: gom small files để cải thiện hiệu năng dashboard và giảm overhead metadata.
 
-- `ACID transactions`: cập nhật, xóa và merge an toàn hơn
-- `Time travel`: truy vấn các snapshot trước đó bằng timestamp hoặc snapshot ID
-- `Schema evolution`: thêm hoặc sửa cột mà không cần viết lại toàn bộ dữ liệu lịch sử
-- `Metadata pruning`: Spark có thể bỏ qua các tệp không liên quan thay vì quét toàn bộ lake
-- `Small-file management`: hỗ trợ compaction để khôi phục hiệu năng
+### 5.4 Vai Trò Của PostgreSQL Catalog
 
-Trong pipeline CDC, sự kiện insert tạo ra bản ghi, sự kiện update tạo ra snapshot mới hơn, và sự kiện delete được xử lý thông qua merge logic. Mặc định, truy vấn thông thường đọc snapshot mới nhất trong khi các phiên bản cũ vẫn còn tồn tại cho đến khi chính sách retention xóa bỏ.
+PostgreSQL trong dự án không đóng vai trò kho dữ liệu nghiệp vụ. Nó là catalog metadata cho Iceberg.
 
-##### 2.5.4 MinIO lưu trữ các tệp dữ liệu vật lý
+PostgreSQL lưu:
 
-Lớp lưu trữ được hỗ trợ bởi object storage `MinIO`, nơi các tệp `Parquet` bên dưới của các bảng Iceberg được lưu giữ.
+- Tên bảng và schema.
+- Vị trí bảng trong MinIO.
+- Snapshot hiện tại và snapshot cũ.
+- Manifest và metadata phục vụ lập kế hoạch truy vấn.
 
-##### 2.5.5 PostgreSQL quản lý metadata Iceberg
+Cách tách này giúp dữ liệu y tế vật lý nằm trong MinIO, còn metadata phục vụ quản lý bảng nằm trong PostgreSQL. Spark, dbt và Superset thông qua Spark Thrift Server dùng catalog để tìm đúng file cần đọc thay vì quét toàn bộ object storage.
 
-Một `PostgreSQL Catalog` riêng biệt lưu metadata cho các bảng Iceberg, bao gồm định nghĩa bảng, manifest và tham chiếu snapshot, trong khi dữ liệu nghiệp vụ thực tế vẫn nằm trong object storage.
+### 5.5 dbt Transformation
 
-Lớp metadata này rất quan trọng cho:
+dbt biến dữ liệu raw thành các model có ý nghĩa nghiệp vụ.
 
-- lập kế hoạch truy vấn nhanh
-- theo dõi snapshot
-- time travel
-- đọc và ghi đồng thời an toàn
-
-#### 2.6 Biến đổi dữ liệu với dbt
-
-`dbt` hoạt động trên các tầng Bronze, Silver và Gold để thực hiện logic biến đổi và tổng hợp, biến dữ liệu streaming raw thành các model sẵn sàng cho phân tích.
-
-Hướng mô hình hóa bao gồm:
-
-- các model `staging` để làm sạch và chuẩn hóa bảng nguồn raw
-- các model `marts` để tạo bảng dimension và fact cho báo cáo
-- các model vật lý được hỗ trợ bởi Iceberg thay vì logic truy vấn tạm thời
+- `staging`: chuẩn hóa bảng nguồn và đặt lại tên cột dễ hiểu hơn.
+- `intermediate`: xử lý logic nghiệp vụ dùng lại nhiều lần.
+- `marts`: tạo bảng phục vụ dashboard theo domain như clinical, finance, pharmacy, executive, operations và core.
+- `incremental model`: chỉ xử lý phần dữ liệu mới hoặc thay đổi, phù hợp dashboard NRT.
+- `merge strategy`: cập nhật bảng Gold vật lý thay vì phụ thuộc vào view nặng và chậm.
 
 <p align="center">
-  <img src="./readme_pic/dbt_example.png" alt="dbt_example"/>
-  <b>Figure 3:</b> Dbt model example<br>
+  <img src="./readme_pic/dbt_example.png" alt="dbt model example"/>
+  <br>
+  <b>Figure 3:</b> dbt model example
 </p>
 
-Đối với các use case gần thời gian thực, dbt sử dụng incremental model với merge logic để chỉ xử lý các bản ghi mới đến hoặc vừa thay đổi.
+## 6. Dashboard Và Phân Tích
 
-#### 2.7 Dashboard và các bài toán phân tích
+Superset là lớp hiển thị cuối cho người dùng nghiệp vụ. Dashboard được thiết kế theo nhiều nhóm nhu cầu:
 
-Nền tảng này được thiết kế để hỗ trợ nhiều loại dashboard, mỗi loại có nhịp refresh và mục đích nghiệp vụ khác nhau.
-
-Các nhóm dashboard bao gồm:
-
-- `Near real-time operational dashboards`: giám sát các hoạt động thay đổi nhanh như nhập viện, luồng bệnh nhân, hoặc sự kiện dịch vụ.
-- `Periodic management dashboards`: hỗ trợ báo cáo theo tuần, tháng, quý và năm.
-- `Department or service dashboards`: phân tách hoạt động theo đơn vị y khoa, nhóm dịch vụ, hoặc các chiều liên quan đến nhân sự.
-- `Executive summary dashboards`: trình bày KPI tổng quan cho ban lãnh đạo bệnh viện.
-
-Đối với luồng dashboard gần thời gian thực:
-
-1. `Spark Structured Streaming` tiếp tục ingest dữ liệu CDC liên tục vào tầng Bronze.
-2. `dbt` xây dựng tầng Gold bằng các bảng incremental vật lý.
-3. `Airflow` chạy một workflow NRT chuyên biệt mỗi 3 phút.
-4. `Superset` đọc trực tiếp từ các bảng Gold đã được làm sạch để phục vụ dashboard.
-
-<!-- Important NRT implementation details include:
-
-- keep `op` and `ts_ms` for CDC-aware downstream logic
-- use a `1 minute` Spark trigger to keep raw data fresh
-- use `materialized='incremental'` with `incremental_strategy='merge'`
-- filter only records with `ts_ms` greater than the latest timestamp already present
-- deduplicate with `ROW_NUMBER() OVER (PARTITION BY id ORDER BY ts_ms DESC)`
-- exclude deleted records with `op != 'd'` when building serving tables -->
-
-Các dashboard batch và dashboard đã chuẩn hóa có thể sử dụng chu kỳ refresh dài hơn và cache windows lớn hơn để giảm tải cho Spark Thrift Server.
-
-#### 2.8 Lớp query và BI
-
-##### 2.8.1 Spark Thrift Server cung cấp lớp query
-
-Khi các bảng đã chuẩn hóa sẵn sàng, `Spark SQL Thrift Server` cung cấp một query engine dựa trên SQL để các công cụ BI có thể truy cập dữ liệu theo cách tiêu chuẩn.
-
-##### 2.8.2 Superset cung cấp lớp trực quan hóa
-
-`Superset` kết nối tới query engine và cung cấp dashboard, chart và các màn hình báo cáo cho người dùng cuối.
-
-Trong dự án này, quyền truy cập dashboard được kiểm soát theo vai trò người dùng để mỗi nhóm chỉ nhìn thấy các dashboard phù hợp với trách nhiệm của mình, như `Ban giám đốc`, `Trưởng khoa`, `Nhân sự`, `Kế toán`, và `Dược`, v.v.
+- `Near real-time dashboard`: theo dõi hoạt động thay đổi nhanh như lượt khám, bệnh nhân đang chờ, doanh thu trong ngày hoặc mật độ chuyên khoa theo giờ.
+- `Management dashboard`: báo cáo tuần, tháng, quý, năm cho quản lý.
+- `Department dashboard`: phân tích theo khoa, phòng, nhóm dịch vụ hoặc nhân sự.
+- `Executive dashboard`: KPI tổng quan cho ban điều hành.
+- `Pharmacy dashboard`: theo dõi đơn thuốc, cấp phát và hoạt động dược.
+- `Finance dashboard`: doanh thu, thanh toán, cơ cấu dịch vụ và so sánh theo thời gian.
 
 <p align="center">
-  <img src="./readme_pic/superset_visual.png" alt="superset_visual"/>
-  <b>Figure 4:</b> Superset dashboard example<br>
+  <img src="./readme_pic/superset_visual.png" alt="Superset dashboard"/>
+  <br>
+  <b>Figure 4:</b> Superset dashboard example
 </p>
 
-Thiết kế này đặc biệt hữu ích cho các tình huống báo cáo như xu hướng nhập viện, mức độ sử dụng dịch vụ, giám sát hoạt động bệnh nhân, và báo cáo quản trị theo ngày, tuần, tháng, quý hoặc năm.
+Luồng dashboard NRT:
 
-#### 2.9 Điều phối và vận hành bảo trì
+1. Spark Streaming ghi CDC liên tục vào Bronze.
+2. dbt incremental cập nhật Gold theo chu kỳ ngắn.
+3. Airflow chạy DAG NRT mỗi 3 phút.
+4. Superset đọc bảng Gold đã chuẩn hóa và auto refresh theo nhu cầu.
 
-`Airflow` và `Crontab` chịu trách nhiệm lên lịch các job biến đổi, chu kỳ refresh và các tác vụ vận hành bảo trì để giữ cho nền tảng chạy ổn định.
+## 7. Vận Hành Và Bảo Trì
 
-Các cơ chế bảo vệ trong điều phối bao gồm:
+### 7.1 Airflow
 
-- `schedule_interval='*/3 * * * *'`
-- `max_active_runs=1`
-- `catchup=False`
-
-Điều này ngăn các lần chạy chồng lên nhau, tránh replay storm sau khi downtime, và giữ cho server ổn định.
-
-Bảo trì cũng rất cần thiết vì ingest gần thời gian thực tạo ra rất nhiều small files. Các tác vụ quan trọng bao gồm:
-
-- `rewrite_data_files` để compact small files thành các tệp lớn hơn
-- `rewrite_manifests` để giảm overhead metadata
-- `expire_snapshots` để xóa lịch sử cũ và kiểm soát tăng trưởng lưu trữ
-- các xử lý vận hành như khắc phục lỗi đầy inode khi cần
+Airflow chịu trách nhiệm điều phối các job có điểm bắt đầu và kết thúc rõ ràng, đặc biệt là dbt và maintenance.
 
 <p align="center">
-  <img src="./readme_pic/air_flow.png" alt="DAG airflow"/>
-  <b>Figure 5:</b> DAG airflow <br>
+  <img src="./readme_pic/air_flow.png" alt="Airflow DAG"/>
+  <br>
+  <b>Figure 5:</b> Airflow DAG
 </p>
 
-#### 2.10 Ghi chú triển khai
+Cấu hình vận hành quan trọng:
 
-Dự án được thiết kế để chạy trên hạ tầng Linux VPS với tài nguyên vừa phải.
+- `schedule_interval='*/3 * * * *'` cho workflow near real-time.
+- `max_active_runs=1` để tránh job chồng nhau.
+- `catchup=False` để không replay hàng loạt sau downtime.
+- Tách DAG NRT khỏi DAG batch để giảm rủi ro ảnh hưởng lẫn nhau.
 
-Các mẫu hình hạ tầng bao gồm:
+### 7.2 Maintenance Iceberg Và MinIO
 
-- `MinIO` cài đặt native để giảm memory overhead so với Docker
-- các Spark job chạy dài hạn được quản lý bằng `tmux`, `nohup`, hoặc `systemd`
-- `Airflow` được triển khai với swap khi cần trên máy có ít bộ nhớ
-- các service `Airflow` được quản lý bằng `systemd` để tự động khởi động và restart
-- `Superset` được triển khai riêng và kết nối tới Spark Thrift Server
+Streaming ghi liên tục có thể tạo nhiều small files và metadata. Vì vậy hệ thống cần bảo trì định kỳ:
 
-Các mối quan tâm khi vận hành bao gồm Spark streaming liên tục tạo ra nhiều small files, metadata Iceberg tăng nhanh nếu snapshots không bao giờ được expire, cần chỉnh timeout truy vấn trong Superset, và hiệu năng PostgreSQL catalog ảnh hưởng đến lập kế hoạch truy vấn.
+- `rewrite_data_files`: compact small files thành file lớn hơn.
+- `rewrite_manifests`: giảm overhead metadata khi query planning.
+- `expire_snapshots`: xóa snapshot quá cũ để kiểm soát dung lượng.
+- Theo dõi inode, dung lượng ổ đĩa và kích thước metadata.
+- Điều chỉnh timeout, cache và refresh interval trong Superset để tránh gây tải không cần thiết.
 
-<!-- #### 2.11 Current Progress
+### 7.3 Triển Khai Trên VPS
 
-Based on the project notes, the implementation status is:
+Dự án được thiết kế để chạy trên hạ tầng Linux VPS tài nguyên vừa phải.
 
-1. `Core HIS -> Debezium -> Kafka`: completed
-2. `Kafka -> Spark Structured Streaming -> Iceberg raw data on MinIO`: completed
-3. `Airflow` orchestration for dbt: implemented as the next operational layer
-4. `Near real-time dashboard flow`: defined and optimized around a 3-minute cycle
-5. `Superset` dashboards on top of curated data: final serving layer -->
+- MinIO có thể cài native để giảm overhead so với Docker.
+- Spark Streaming chạy dài hạn bằng `tmux`, `nohup` hoặc `systemd`.
+- Spark Thrift Server chạy như service riêng để phục vụ SQL.
+- Airflow có thể dùng `systemd` để tự restart scheduler và webserver.
+- Superset nên dùng metadata database riêng như PostgreSQL thay vì SQLite khi cần vận hành ổn định.
 
-## 3. Kỹ năng đạt được sau khi hoàn thành project
+## 8. Tài Liệu Nghiệp Vụ
 
-Dự án này không chỉ mang lại một nền tảng phân tích y tế đang hoạt động, mà còn giúp hình thành một bộ kỹ năng và thành tựu thực tế rõ ràng thông qua quá trình thiết kế, triển khai, vận hành và phát triển dashboard.
+Dự án không chỉ có pipeline kỹ thuật mà còn có tài liệu hóa nghiệp vụ:
 
-### 3.1 Techical skills
-
-Hoàn thành dự án này giúp củng cố các kỹ năng cốt lõi trong data engineering hiện đại, đặc biệt là:
-
-- thiết kế kiến trúc lakehouse dựa trên CDC từ đầu đến cuối
-- xây dựng pipeline streaming với `Debezium`, `Kafka` và `Spark Structured Streaming`
-- mô hình hóa nền tảng dữ liệu theo kiến trúc `Bronze`, `Silver` và `Gold`
-- làm việc với `Apache Iceberg` cho bảng ACID, quản lý snapshot, schema evolution và time travel
-- triển khai logic biến đổi gần thời gian thực với xử lý incremental và merge strategies
-- mở dữ liệu sẵn sàng cho phân tích thông qua lớp phục vụ SQL cho BI
-
-### 3.2 Tool skills
-
-Dự án cũng phát triển khả năng thực hành với các công cụ chính được sử dụng trong toàn bộ nền tảng, bao gồm:
-
-- cấu hình connector `Debezium` cho ingest CDC
-- quản lý Kafka topics và hiểu được cơ chế di chuyển dữ liệu theo sự kiện
-- phát triển Spark jobs cho ingest liên tục và ghi bảng
-- sử dụng `MinIO` làm object storage cho các tệp dữ liệu lakehouse
-- bảo trì `PostgreSQL` Iceberg catalog cho quản lý metadata
-- xây dựng các model biến đổi trong `dbt`
-- lên lịch workflow và công việc bảo trì bằng `Airflow` và `Crontab`
-- phục vụ dữ liệu qua `Spark Thrift Server`
-- tạo dashboard và phân quyền theo vai trò trong `Superset`
-- vận hành nền tảng trên môi trường Linux với các công cụ như `systemd`, `tmux` và `nohup`
-
-### 3.3 Kiến thức domain
-
-Bên cạnh phần kỹ thuật, dự án này còn giúp xây dựng kiến thức domain trong phân tích y tế và báo cáo vận hành, như:
-
-- hiểu cách các hệ thống nguồn của bệnh viện hoặc phòng khám tạo ra dữ liệu giao dịch
-- nhận diện các object y tế quan trọng như bệnh nhân, lượt khám, dịch vụ, hóa đơn, khoa phòng và đơn vị dịch vụ
-- hiểu sự khác nhau giữa ghi nhận dữ liệu vận hành và dữ liệu đã sẵn sàng cho báo cáo phân tích
-- thiết kế dashboard cho các vai trò tổ chức khác nhau như `Ban giám đốc`, `Trưởng khoa`, `Nhân sự`, `Kế toán`, và `Dược`
-- cân bằng nhu cầu giám sát gần thời gian thực với nhu cầu báo cáo quản trị định kỳ
-- nhận ra các ràng buộc vận hành trong môi trường y tế, nơi hệ thống nguồn phải luôn ổn định trong khi workload phân tích vẫn chạy song song
-
-### 3.4 Tài liệu hóa quy trình nghiệp vụ và dữ liệu
-
-Bên cạnh việc triển khai nền tảng dữ liệu, dự án cũng bao gồm các tài liệu phân tích và tài liệu hóa bổ trợ.
-
-Những tài liệu này giúp kết nối pipeline kỹ thuật với bối cảnh nghiệp vụ thực tế:
-
-- File `.bpmn` mô tả quy trình vận hành và quy trình nghiệp vụ trong môi trường bệnh viện hoặc phòng khám
+- File `.bpmn` mô tả quy trình như tiếp đón, khám bệnh, chỉ định cận lâm sàng, thanh toán, cấp phát thuốc và khám sức khỏe đoàn.
+- File `.dbml` mô tả cấu trúc cơ sở dữ liệu và quan hệ giữa các thực thể.
+- Các model dbt phản ánh domain bệnh viện như clinical, finance, pharmacy, operations, executive và core.
 
 <p align="center">
-  <img src="./readme_pic/bpmn.png" alt="bpmn"
-  <b>Figure 6:</b> Business process diagram example <br>
+  <img src="./readme_pic/bpmn.png" alt="BPMN"/>
+  <br>
+  <b>Figure 6:</b> Business process diagram example
 </p>
 
-- File `.dbml` mô tả cấu trúc cơ sở dữ liệu, quan hệ giữa các bảng, và các thực thể nghiệp vụ được sử dụng trong hệ thống nguồn
+Phần tài liệu này giúp liên kết dữ liệu kỹ thuật với quy trình thực tế, tránh xây dashboard chỉ dựa trên bảng mà không hiểu nghiệp vụ phía sau.
 
-Tài liệu này quan trọng vì nó giúp giải thích cách các hoạt động vận hành được chuyển thành dữ liệu nguồn, cách các bảng liên kết với quy trình nghiệp vụ thực tế, và cách các model phân tích downstream nên được thiết kế.
+## 9. Kỹ Năng Đạt Được
 
-## 4. Định hướng phát triển
+### 9.1 Kỹ Năng Kỹ Thuật
 
-Các bước tiếp theo tiềm năng đã được đề cập trong ghi chú lập kế hoạch của dự án bao gồm:
+- Thiết kế kiến trúc lakehouse end-to-end cho dữ liệu bệnh viện.
+- Xây dựng pipeline CDC với Debezium, Kafka và Spark Structured Streaming.
+- Ghi dữ liệu CDC vào Apache Iceberg bằng upsert/delete.
+- Tổ chức dữ liệu theo Bronze, Silver và Gold.
+- Xây dựng model dbt cho staging, intermediate và mart.
+- Phục vụ dữ liệu phân tích qua Spark Thrift Server và Superset.
+- Tối ưu vận hành small files, metadata và snapshot retention.
 
-- dashboard machine learning xây dựng trên dữ liệu đã chuẩn hóa có thể đọc bằng Spark
-- workflow AI hoặc chatbot để tra cứu lịch sử điều trị và hỗ trợ ra quyết định
-- dashboard quản trị bệnh viện phong phú hơn cho báo cáo điều hành
+### 9.2 Kỹ Năng Công Cụ
 
-## Tổng kết
+- Debezium connector và Kafka topic.
+- Spark Structured Streaming và Spark SQL.
+- MinIO object storage.
+- Apache Iceberg và PostgreSQL JDBC Catalog.
+- dbt model, incremental và merge.
+- Airflow DAG, schedule và retry control.
+- Superset dashboard, dataset, chart và role-based access.
+- Linux service operation bằng `systemd`, `tmux`, `nohup`, cron và swap.
 
-Dự án này cho thấy một kiến trúc lakehouse thực tế cho bệnh viện, kết hợp ingest streaming, lưu trữ bảng giao dịch, biến đổi có lên lịch, và dashboard gần thời gian thực trên hạ tầng hạn chế.
+### 9.3 Kiến Thức Domain
 
-Những quyết định kỹ thuật quan trọng nhất trong dự án bao gồm:
+- Hiểu cách dữ liệu bệnh viện phát sinh từ quy trình vận hành.
+- Nhận diện các thực thể chính như bệnh nhân, lượt khám, dịch vụ, khoa phòng, nhân viên, hóa đơn và đơn thuốc.
+- Phân biệt dữ liệu giao dịch vận hành với dữ liệu phân tích đã chuẩn hóa.
+- Thiết kế dashboard theo vai trò người dùng thay vì một dashboard chung cho tất cả.
+- Cân bằng giữa nhu cầu cập nhật nhanh và yêu cầu ổn định của hệ thống y tế.
 
-- giữ Spark Structured Streaming là ingest engine cốt lõi
-- sử dụng Iceberg trên MinIO thay vì tệp raw thông thường
-- sử dụng PostgreSQL làm metadata catalog thay vì kho dữ liệu nghiệp vụ
-- sử dụng dbt kết hợp Airflow để cầu nối dữ liệu CDC raw thành các model NRT và báo cáo đã chuẩn hóa
+## 10. Định Hướng Phát Triển
+
+- Bổ sung kiểm thử dữ liệu trong dbt để kiểm tra khóa chính, null, quan hệ và giá trị bất thường.
+- Chuẩn hóa thêm phân quyền dashboard theo nhóm người dùng thực tế.
+- Mở rộng monitoring cho Kafka lag, Spark Streaming status, Airflow run status và Superset query latency.
+- Tối ưu retention policy cho Iceberg snapshot theo yêu cầu kiểm toán.
+- Phát triển dashboard machine learning hoặc AI assistant trên dữ liệu Gold đã chuẩn hóa.
+
+## Tổng Kết
+
+Dự án này là một nền tảng data lakehouse thực tế cho bệnh viện, kết hợp CDC, streaming, Iceberg table format, dbt transformation, Airflow orchestration và Superset dashboard.
+
+Giá trị chính của thiết kế nằm ở 4 điểm:
+
+- **Chính xác**: CDC, merge theo khóa chính, deduplicate, dbt modeling và Iceberg snapshot.
+- **Nhanh chóng**: streaming ingest, incremental transform và dashboard near real-time 3 phút.
+- **Ổn định**: tách lớp rõ ràng, Airflow guardrails, ACID transaction và maintenance định kỳ.
+- **Bảo mật**: tách hệ thống phân tích khỏi HIS, phân quyền Superset, quản lý metadata riêng và giảm truy cập trực tiếp vào dữ liệu nguồn.
