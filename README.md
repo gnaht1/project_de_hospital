@@ -68,7 +68,7 @@ The system is designed to move new HIS data into the analytics layer with low la
 
 - CDC continuously pushes changes into `Kafka`, avoiding full-table export cycles.
 - Spark Streaming reads Kafka 24/7 and writes to Bronze in micro-batches.
-- Ingestion triggers are designed around short cycles, for example 1 minute for the raw layer.
+<!-- - Ingestion triggers are designed around short cycles, for example 1 minute for the raw layer. -->
 - Near real-time dashboards use physical Gold tables updated incrementally by dbt.
 - Airflow has a dedicated NRT DAG that runs every 3 minutes with `schedule_interval='*/3 * * * *'`.
 - Superset reads directly from cleaned Gold tables through Spark Thrift Server and can use 1-5 minute auto refresh for operational dashboards.
@@ -143,7 +143,7 @@ Data description document: [Google Sheet](https://docs.google.com/spreadsheets/d
 ### 5.2 Bronze, Silver, and Gold
 
 - `Bronze`: stores raw CDC data from Kafka and preserves technical fields such as `op`, `ts_ms`, and ingestion timestamp.
-- `Silver`: cleans data, standardizes data types, normalizes keys, and removes basic noise.
+- `Silver`: cleans and enriches data from staging, filters invalid records, joins reference information, standardizes selected time/value fields, and creates intermediate business classifications.
 - `Gold`: analytics-ready tables for dashboards, KPIs, and business reporting.
 
 <p align="center">

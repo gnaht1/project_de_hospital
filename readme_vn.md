@@ -68,7 +68,7 @@ Hệ thống được thiết kế để đưa dữ liệu mới từ HIS lên l
 
 - CDC đẩy thay đổi vào `Kafka` liên tục, không cần chờ export toàn bảng.
 - Spark Streaming đọc Kafka 24/7 và ghi vào Bronze theo micro-batch.
-- Trigger ingest được thiết kế quanh chu kỳ ngắn, ví dụ 1 phút cho lớp raw.
+<!-- - Trigger ingest được thiết kế quanh chu kỳ ngắn, ví dụ 1 phút cho lớp raw. -->
 - Dashboard near real-time dùng bảng Gold vật lý được dbt cập nhật incremental.
 - Airflow có DAG riêng cho luồng NRT, chạy theo chu kỳ 3 phút với `schedule_interval='*/3 * * * *'`.
 - Superset đọc trực tiếp từ bảng Gold đã làm sạch qua Spark Thrift Server, có thể cấu hình auto refresh 1-5 phút cho dashboard vận hành.
@@ -143,7 +143,7 @@ Tài liệu mô tả dữ liệu: [Google Sheet](https://docs.google.com/spreads
 ### 5.2 Bronze, Silver Và Gold
 
 - `Bronze`: lưu dữ liệu CDC raw từ Kafka, giữ các thông tin kỹ thuật như `op`, `ts_ms` và thời điểm ingest.
-- `Silver`: làm sạch, chuẩn hóa kiểu dữ liệu, chuẩn hóa khóa và loại bỏ nhiễu cơ bản.
+- `Silver`: làm sạch và làm giàu dữ liệu từ staging, lọc các bản ghi không hợp lệ, join thêm thông tin tham chiếu, chuẩn hóa một số trường thời gian/giá trị và tạo các phân loại nghiệp vụ trung gian.
 - `Gold`: bảng phân tích sẵn sàng cho dashboard, KPI và báo cáo nghiệp vụ.
 
 <p align="center">
