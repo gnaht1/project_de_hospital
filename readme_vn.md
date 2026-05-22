@@ -1,5 +1,6 @@
 # Xây dựng mô hình data cho phòng khám Jarvis
 
+*Link demo online: [Link](./readme_vn.md)*
 
 ## Mục Lục
   - [1. Bối cảnh](#1-bối-cảnh)
@@ -102,12 +103,14 @@ mọi biến động dữ liệu nguồn thay vì phụ thuộc vào batch expor
 
 Hệ thống được thiết kế để đưa dữ liệu mới từ HIS lên lớp phân tích với độ trễ thấp nhưng vẫn kiểm soát được tài nguyên.
 
-- CDC đẩy thay đổi vào `Kafka` liên tục, không cần chờ export toàn bảng.
-- Spark Streaming đọc Kafka 24/7 và ghi vào Bronze theo micro-batch.
-<!-- - Trigger ingest được thiết kế quanh chu kỳ ngắn, ví dụ 1 phút cho lớp raw. -->
-- Dashboard near real-time dùng bảng Gold vật lý được dbt cập nhật incremental.
-- Airflow có DAG riêng cho luồng NRT, chạy theo chu kỳ 3 phút với `schedule_interval='*/3 * * * *'`.
-- Superset đọc trực tiếp từ bảng Gold đã làm sạch qua Spark Thrift Server, có thể cấu hình auto refresh 1-5 phút cho dashboard vận hành.
+- Dữ liệu được đồng bộ theo cơ chế `CDC -> Kafka -> Spark Structured Streaming -> Iceberg`, nên chỉ đẩy phần bản ghi thay đổi thay vì quét lại toàn bảng mỗi lần.
+- Ở tầng ingest, hệ thống đang khởi tạo `31 stream` tương ứng `31 topic / 31 bảng core`, giúp nhiều nhóm dữ liệu được xử lý song song thay vì dồn vào một job tuần tự.
+- Mức song song xử lý trong Spark hiện được cấu hình ở `spark.sql.shuffle.partitions = 4`, tức là mỗi micro-batch được chia thành `4 luồng xử lý logic` để phù hợp với VPS tài nguyên vừa phải.
+- Mỗi stream đọc Kafka liên tục 24/7, có `checkpoint` riêng cho từng bảng và giới hạn `maxOffsetsPerTrigger = 5000`, tức là tối đa `5.000 CDC event` cho mỗi lần trigger trên một topic để tránh nghẽn RAM hoặc commit quá lớn.
+- Trigger ingest hiện tại là `5 phút/lần`, nghĩa là sau mỗi chu kỳ Spark sẽ gom các thay đổi mới, deduplicate theo khóa chính và `ts_ms`, rồi `MERGE INTO` vào Bronze Iceberg để đồng bộ đúng trạng thái mới nhất.
+- Ở tầng phục vụ báo cáo nhanh, các model Gold near real-time được `dbt` cập nhật theo kiểu incremental qua một DAG Airflow riêng chạy `3 phút/lần` với `schedule='*/3 * * * *'`.
+- Như vậy, với các dashboard vận hành, độ trễ thực tế thường nằm trong khoảng `3-8 phút` tùy thời điểm sự kiện rơi vào chu kỳ ingest 5 phút hay chu kỳ dbt 3 phút.
+- Superset chỉ đọc từ bảng Gold vật lý đã được làm sạch qua Spark Thrift Server, nên không phải join lại dữ liệu raw lúc người dùng mở dashboard; dashboard có thể auto-refresh mỗi `1-5 phút` mà vẫn giữ trải nghiệm ổn định.
 
 ### 2.3.3 Ổn Định
 
@@ -120,6 +123,7 @@ Pipeline được tách lớp rõ ràng để mỗi thành phần làm đúng va
 - Iceberg hỗ trợ ACID transaction, giúp dashboard không đọc phải trạng thái nửa ghi nửa chưa ghi.
 - Các tác vụ `rewrite_data_files`, `rewrite_manifests` và `expire_snapshots` kiểm soát small files, metadata và dung lượng lưu trữ.
 - Các service dài hạn như Spark job, Spark Thrift Server, Airflow và Superset có thể chạy bằng `systemd`, `tmux` hoặc `nohup` tùy môi trường.
+- Iceberg snapshot và metadata catalog giúp kiểm soát lịch sử thay đổi, hỗ trợ truy vết khi cần kiểm tra dữ liệu.
 
 ### 2.3.4 Bảo Mật
 
@@ -130,7 +134,6 @@ Thiết kế bảo mật tập trung vào tách trách nhiệm dữ liệu, ki�
 - Người dùng cuối truy cập qua dashboard hoặc SQL serving layer, không truy cập trực tiếp vào hệ thống HIS vận hành.
 - Các khóa truy cập MinIO, PostgreSQL và service account được tách khỏi logic model, giúp dễ quản lý bằng biến môi trường hoặc file cấu hình riêng.
 - Kiến trúc lakehouse tách workload phân tích khỏi database nguồn, giảm rủi ro dashboard hoặc truy vấn nặng ảnh hưởng hệ thống vận hành bệnh viện.
-- Iceberg snapshot và metadata catalog giúp kiểm soát lịch sử thay đổi, hỗ trợ truy vết khi cần kiểm tra dữ liệu.
 
 
 ## 3. Chi tiết hiện thực hoá mô hình data-lakehouse

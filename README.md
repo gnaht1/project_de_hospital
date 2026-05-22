@@ -2,6 +2,8 @@
 
 Vietnamese version: [Link](./readme_vn.md).
 
+*Link demo online: [Link](./readme_vn.md)*
+
 <!-- This project builds a hospital data pipeline on a lakehouse architecture, moving transactional HIS data into a near real-time analytics environment. The design focuses on four core qualities: accuracy, speed, stability, and security. -->
 
 ## Table of Contents
@@ -99,11 +101,14 @@ The system prioritizes data accuracy from the moment records are created in HIS 
 
 The system is designed to move new HIS data into the analytics layer with low latency while keeping resource usage controlled.
 
-- CDC continuously pushes changes into `Kafka`, avoiding full-table export cycles.
-- Spark Streaming reads Kafka 24/7 and writes into Bronze in micro-batches.
-- Near real-time dashboards use physical Gold tables updated incrementally by dbt.
-- Airflow has a dedicated NRT DAG running every 3 minutes with `schedule_interval='*/3 * * * *'`.
-- Superset reads directly from cleaned Gold tables through Spark Thrift Server and can auto-refresh every 1 to 5 minutes for operational dashboards.
+- Data is synchronized through the `CDC -> Kafka -> Spark Structured Streaming -> Iceberg` flow, so only changed records are propagated instead of rescanning full tables each cycle.
+- At the ingestion layer, the system currently initializes `31 streams` for `31 topics / 31 core tables`, allowing multiple data domains to be processed in parallel instead of through one sequential job.
+- Spark parallelism is currently configured with `spark.sql.shuffle.partitions = 4`, meaning each micro-batch is split into `4 logical processing partitions`, which fits the resource limits of a modest VPS.
+- Each stream reads Kafka continuously 24/7, keeps a dedicated `checkpoint` per table, and uses `maxOffsetsPerTrigger = 5000`, meaning up to `5,000 CDC events` can be processed per trigger for each topic without creating oversized commits or memory pressure.
+- The current ingestion trigger runs every `5 minutes`, so in each cycle Spark gathers the latest changes, deduplicates them by primary key and `ts_ms`, then performs `MERGE INTO` on Bronze Iceberg to synchronize the latest record state.
+- For fast reporting, near real-time Gold models are updated incrementally by `dbt` through a dedicated Airflow DAG running every `3 minutes` with `schedule='*/3 * * * *'`.
+- As a result, operational dashboards typically see an end-to-end latency of around `3 to 8 minutes`, depending on whether an event arrives near the Spark 5-minute ingestion cycle or the dbt 3-minute refresh cycle.
+- Superset reads only from cleaned physical Gold tables through Spark Thrift Server, so it does not need to recompute raw joins when users open dashboards; operational views can auto-refresh every `1 to 5 minutes` while remaining stable.
 
 ### 2.3.3 Stability
 
@@ -116,6 +121,7 @@ The pipeline is clearly separated so each component has a specific responsibilit
 - Iceberg supports ACID transactions so dashboards do not read partially committed data.
 - `rewrite_data_files`, `rewrite_manifests`, and `expire_snapshots` control small files, metadata growth, and storage usage.
 - Long-running services such as Spark jobs, Spark Thrift Server, Airflow, and Superset can be managed with `systemd`, `tmux`, or `nohup`.
+- Iceberg snapshots and the metadata catalog support traceability and data auditability.
 
 ### 2.3.4 Security
 
@@ -126,7 +132,7 @@ The security design focuses on separating responsibilities, controlling access, 
 - End users access data through dashboards or the SQL serving layer, not directly through the operational HIS database.
 - MinIO keys, PostgreSQL credentials, and service accounts are separated from model logic so they can be managed through environment variables or dedicated configuration files.
 - The lakehouse architecture separates analytical workloads from the source database, reducing the risk of heavy dashboards or queries affecting clinic operations.
-- Iceberg snapshots and the metadata catalog support traceability and data auditability.
+
 
 ## 3. Implementation Details of the Data Lakehouse Model
 

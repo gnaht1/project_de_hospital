@@ -1,23 +1,37 @@
 #!/bin/bash
 
-# Khai báo môi trường
+# ==============================
+# Iceberg Lakehouse Maintenance
+# Safe hourly version for small VPS
+# ==============================
+
+set -o pipefail
+
 export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 SPARK_SQL="/opt/spark/bin/spark-sql"
 
-echo "--- [$(date)] BẮT ĐẦU BẢO TRÌ LAKEHOUSE (RAW LAYER) ---"
+LOG_PREFIX="--- [$(date '+%Y-%m-%d %H:%M:%S')]"
 
-echo "1. Đang tạm dừng main_job.py và giải phóng RAM..."
-pkill -f main_job.py
-pkill -f "Hospital_CDC"
-sleep 5
-rm -rf /root/metastore_db/db.lck
+echo "$LOG_PREFIX BẮT ĐẦU BẢO TRÌ LAKEHOUSE ---"
 
-# Tính ngày giờ của 3 ngày trước
-EXPIRE_DATE=$(date -d "3 days ago" +"%Y-%m-%d %H:%M:%S")
-echo "=> Thời gian sẽ xóa Snapshot: trước $EXPIRE_DATE"
+# Snapshot có thể dọn ngắn để giảm metadata nhanh
+SNAPSHOT_EXPIRE_DATE=$(date -d "2 hours ago" +"%Y-%m-%d %H:%M:%S")
 
-# Khai báo danh sách các bảng RAW cần bảo trì
-TABLES=(
+# Orphan files bắt buộc nên >= 24h, Iceberg sẽ chặn nếu thấp hơn
+ORPHAN_EXPIRE_DATE=$(date -d "25 hours ago" +"%Y-%m-%d %H:%M:%S")
+
+echo "=> Sẽ xóa snapshots cũ hơn: $SNAPSHOT_EXPIRE_DATE"
+echo "=> Sẽ xóa orphan files cũ hơn: $ORPHAN_EXPIRE_DATE"
+
+# File SQL tạm
+TEMP_SQL_FILE="/tmp/run_iceberg_maintenance.sql"
+> "$TEMP_SQL_FILE"
+
+# ==============================
+# 1. Các bảng RAW / Bronze
+# ==============================
+
+RAW_TABLES=(
   "db.dm_khoa_iceberg"
   "db.dm_loai_dich_vu_iceberg"
   "db.ct_address_iceberg"
@@ -51,19 +65,46 @@ TABLES=(
   "db.hospital_configs_iceberg"
 )
 
-# TẠO FILE SQL ĐỘNG ĐỂ CHẠY 1 LẦN DUY NHẤT (Cứu tinh cho CPU/RAM)
-TEMP_SQL_FILE="/tmp/run_maintenance_job.sql"
-> $TEMP_SQL_FILE # Xóa trắng file tạm
+# ==============================
+# 2. Các bảng dbt / NRT dễ phình metadata
+# ==============================
 
-for table in "${TABLES[@]}"; do
-    echo "CALL his_catalog.system.rewrite_data_files(table => '${table}');" >> $TEMP_SQL_FILE
-    echo "CALL his_catalog.system.rewrite_manifests(table => '${table}');" >> $TEMP_SQL_FILE
-    echo "CALL his_catalog.system.expire_snapshots(table => '${table}', older_than => TIMESTAMP '${EXPIRE_DATE}');" >> $TEMP_SQL_FILE
+HOT_TABLES=(
+  "gold_db.mart_core__dm_benh_nhan_snapshot"
+  "gold_db.mart_finance__nrt_revenue_receipts"
+  "gold_db.mart_finance__nrt_revenue_today_vs_yesterday"
+  "gold_db.mart_clinical__nrt_specialty_density_hourly"
+  "silver_db.int_clinical__specialty_visits"
+)
+
+# ==============================
+# 3. Sinh SQL maintenance
+# ==============================
+
+echo "-- Auto generated Iceberg maintenance SQL" >> "$TEMP_SQL_FILE"
+echo "-- Generated at $(date)" >> "$TEMP_SQL_FILE"
+echo "" >> "$TEMP_SQL_FILE"
+
+for table in "${RAW_TABLES[@]}"; do
+    echo "-- Maintenance for ${table}" >> "$TEMP_SQL_FILE"
+    echo "CALL his_catalog.system.expire_snapshots(table => '${table}', older_than => TIMESTAMP '${SNAPSHOT_EXPIRE_DATE}', retain_last => 1);" >> "$TEMP_SQL_FILE"
+    echo "CALL his_catalog.system.rewrite_manifests('${table}');" >> "$TEMP_SQL_FILE"
+    echo "" >> "$TEMP_SQL_FILE"
 done
 
-echo "2. Đang thực thi lệnh bảo trì Iceberg..."
+for table in "${HOT_TABLES[@]}"; do
+    echo "-- Aggressive maintenance for hot table ${table}" >> "$TEMP_SQL_FILE"
+    echo "CALL his_catalog.system.expire_snapshots(table => '${table}', older_than => TIMESTAMP '${SNAPSHOT_EXPIRE_DATE}', retain_last => 1);" >> "$TEMP_SQL_FILE"
+    echo "CALL his_catalog.system.rewrite_manifests('${table}');" >> "$TEMP_SQL_FILE"
+    echo "CALL his_catalog.system.remove_orphan_files(table => '${table}', older_than => TIMESTAMP '${ORPHAN_EXPIRE_DATE}');" >> "$TEMP_SQL_FILE"
+    echo "" >> "$TEMP_SQL_FILE"
+done
 
-# Chạy Spark-SQL 1 lần duy nhất để đọc file SQL vừa tạo
+echo "=> File SQL maintenance:"
+cat "$TEMP_SQL_FILE"
+
+echo "=> Đang chạy Spark SQL maintenance..."
+
 $SPARK_SQL \
   --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.3,org.postgresql:postgresql:42.6.0 \
   --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
@@ -81,12 +122,16 @@ $SPARK_SQL \
   --conf spark.driver.memory=2g \
   --conf spark.executor.memory=2g \
   --conf spark.hadoop.javax.jdo.option.ConnectionURL="jdbc:derby:;databaseName=/tmp/maintenance_derby;create=true" \
-  -f $TEMP_SQL_FILE
+  -f "$TEMP_SQL_FILE"
 
-echo "3. Dọn dẹp xong. Đang khởi động lại Spark Streaming..."
-# Lưu ý: Chỉnh lại đường dẫn tới file main_job.py cho đúng với hệ thống của bạn
-nohup /opt/spark/bin/spark-submit \
-  --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.3,org.postgresql:postgresql:42.6.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
-  /root/hospital_de_project/main_job.py > /root/hospital_de_project/streaming_job.log 2>&1 &
+STATUS=$?
 
-echo "--- [$(date)] BẢO TRÌ HOÀN TẤT ---"
+rm -f "$TEMP_SQL_FILE"
+
+if [ $STATUS -eq 0 ]; then
+    echo "$LOG_PREFIX BẢO TRÌ HOÀN TẤT THÀNH CÔNG ---"
+else
+    echo "$LOG_PREFIX BẢO TRÌ THẤT BẠI, EXIT CODE = $STATUS ---"
+fi
+
+exit $STATUS

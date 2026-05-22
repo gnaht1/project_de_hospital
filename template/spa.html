@@ -1,0 +1,418 @@
+{#
+  Licensed to the Apache Software Foundation (ASF) under one or more
+  contributor license agreements. See the NOTICE file distributed with this work
+  for additional information regarding copyright ownership. The ASF licenses this
+  file to you under the Apache License, Version 2.0 (the "License"); you may not
+  use this file except in compliance with the License. You may obtain a copy of
+  the License at http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software distributed
+  under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+  CONDITIONS OF ANY KIND, either express or implied. See the License for the
+  specific language governing permissions and limitations under the License.
+#}
+
+<!DOCTYPE html>
+<html>
+  {% import 'appbuilder/general/lib.html' as lib %}
+  {% from 'superset/partials/asset_bundle.html' import css_bundle, js_bundle with context %}
+  {% import "superset/macros.html" as macros %}
+  {% set favicons = appbuilder.app.config['FAVICONS'] %}
+
+  <head>
+    <title>
+      {% block title %}
+        {% if title %}
+          {{ title }}
+        {% endif %}
+      {% endblock %}
+    </title>
+
+    {% block head_meta %}{% endblock %}
+
+    <style>
+      body {
+        background: #fff;
+        color: #000;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #000;
+          color: #fff;
+        }
+      }
+    </style>
+
+    {% block head_css %}
+      {% for favicon in favicons %}
+        <link
+          rel="{{ favicon.rel if favicon.rel else 'icon' }}"
+          type="{{ favicon.type if favicon.type else 'image/png' }}"
+          {% if favicon.sizes %}sizes="{{ favicon.sizes }}"{% endif %}
+          href="{{ '' if favicon.href.startswith('http') else assets_prefix }}{{ favicon.href }}"
+        />
+      {% endfor %}
+
+      <link
+        rel="preload"
+        type="text/css"
+        href="{{ assets_prefix }}/static/appbuilder/css/flags/flags16.css"
+        as="style"
+      />
+
+      {# Load custom fonts from configuration #}
+      {% if appbuilder.app.config.get('CUSTOM_FONT_URLS') %}
+        {% for font_url in appbuilder.app.config['CUSTOM_FONT_URLS'] %}
+          <link rel="stylesheet" href="{{ font_url }}" />
+        {% endfor %}
+      {% endif %}
+
+    {% endblock %}
+
+    {{ js_bundle(assets_prefix, 'theme') }}
+
+    <input
+      type="hidden"
+      name="csrf_token"
+      id="csrf_token"
+      value="{{ csrf_token() if csrf_token else '' }}"
+    />
+    {% block head_js %}
+      {% include "head_custom_extra.html" %}
+    {% endblock %}
+  </head>
+
+  <body class="{% if standalone_mode %}standalone {% endif %}{% if request.path.startswith('/login') %}login-with-demo{% endif %}">
+
+        {% block body %}
+      <div id="app" data-bootstrap="{{ bootstrap_data }}">
+        <img
+          src="{{ assets_prefix }}/static/assets/images/loading.gif"
+          alt=""
+          aria-label="Loading"
+          style="
+            width: 50px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+          "
+        />
+      </div>
+    {% endblock %}
+
+    {% if request.path.startswith('/login') %}
+      <style>
+  .login-with-demo {
+    position: relative;
+    min-height: 100vh;
+    overflow-x: hidden;
+    background: #020617;
+    color: #e2e8f0;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+  }
+
+  .login-with-demo::before,
+  .login-with-demo::after {
+    content: "";
+    position: fixed;
+    border-radius: 999px;
+    filter: blur(10px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .login-with-demo::before {
+    width: 320px;
+    height: 320px;
+    top: -120px;
+    left: -120px;
+    background: rgba(37, 99, 235, 0.16);
+  }
+
+  .login-with-demo::after {
+    width: 400px;
+    height: 400px;
+    right: -160px;
+    bottom: -160px;
+    background: rgba(14, 165, 233, 0.14);
+  }
+
+  .login-with-demo #app {
+    width: 100vw;
+    min-height: 100vh;
+    position: relative;
+    z-index: 2;
+  }
+
+  .demo-login-panel {
+    position: fixed;
+    left: 24px;
+    top: 88px;
+    width: 430px;
+    max-width: calc(100vw - 48px);
+    max-height: calc(100vh - 112px);
+    overflow: auto;
+    z-index: 3;
+    background: rgba(15, 23, 42, 0.94);
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 18px;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+    box-sizing: border-box;
+    padding: 16px;
+  }
+
+  .demo-login-title {
+    margin: 0 0 12px;
+    color: #f8fafc;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .demo-login-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+
+  .demo-login-table th,
+  .demo-login-table td {
+    padding: 8px 6px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  .demo-login-table th {
+    color: #67e8f9;
+    font-weight: 700;
+  }
+
+  .demo-login-table td {
+    color: #e2e8f0;
+  }
+
+  .demo-login-table th:nth-child(1),
+  .demo-login-table td:nth-child(1) {
+    width: 145px;
+  }
+
+  .demo-login-table th:nth-child(2),
+  .demo-login-table td:nth-child(2) {
+    width: 125px;
+  }
+
+  .demo-login-table th:nth-child(3),
+  .demo-login-table td:nth-child(3) {
+    width: auto;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .demo-login-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .demo-login-table code {
+    display: inline-block;
+    background: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+    padding: 4px 5px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .demo-copy-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  .demo-copy-btn {
+    position: relative;
+    width: 20px;
+    height: 20px;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 6px;
+    background: rgba(15, 23, 42, 0.65);
+    color: #cbd5e1;
+    cursor: pointer;
+    padding: 0;
+    flex: 0 0 auto;
+  }
+
+  .demo-copy-btn::before,
+  .demo-copy-btn::after {
+    content: "";
+    position: absolute;
+    width: 8px;
+    height: 10px;
+    border: 1px solid currentColor;
+    border-radius: 2px;
+  }
+
+  .demo-copy-btn::before {
+    left: 5px;
+    top: 4px;
+    background: rgba(15, 23, 42, 0.95);
+  }
+
+  .demo-copy-btn::after {
+    left: 7px;
+    top: 6px;
+    background: rgba(15, 23, 42, 0.95);
+  }
+
+  .demo-copy-btn:hover,
+  .demo-copy-btn:focus {
+    background: rgba(14, 165, 233, 0.18);
+    border-color: rgba(103, 232, 249, 0.55);
+    color: #67e8f9;
+    outline: none;
+  }
+
+  .demo-copy-btn.is-copied {
+    background: rgba(34, 197, 94, 0.18);
+    border-color: rgba(74, 222, 128, 0.6);
+    color: #86efac;
+  }
+
+  .demo-copy-btn.is-copied::before {
+    content: "✓";
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 21px;
+    text-align: center;
+  }
+
+  .demo-copy-btn.is-copied::after {
+    display: none;
+  }
+
+  @media (max-width: 1100px) {
+    .login-with-demo #app {
+      width: 100vw;
+    }
+
+    .demo-login-panel {
+      position: static;
+      width: auto;
+      max-width: none;
+      max-height: none;
+      margin: 16px;
+    }
+  }
+</style>
+
+      <div class="demo-login-panel">
+        <h3 class="demo-login-title">Demo accounts table</h3>
+        <table class="demo-login-table">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Password</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="demo-copy-cell"><code>global_viewer</code><button class="demo-copy-btn" type="button" data-copy-text="global_viewer" aria-label="Copy username global_viewer" title="Copy username"></button></span></td>
+              <td><span class="demo-copy-cell"><code>huynhthang</code><button class="demo-copy-btn" type="button" data-copy-text="huynhthang" aria-label="Copy password" title="Copy password"></button></span></td>
+              <td>Tài khoản xem all dashboards</td>
+            </tr>
+            <tr>
+              <td><span class="demo-copy-cell"><code>ban_giam_doc</code><button class="demo-copy-btn" type="button" data-copy-text="ban_giam_doc" aria-label="Copy username ban_giam_doc" title="Copy username"></button></span></td>
+              <td><span class="demo-copy-cell"><code>huynhthang</code><button class="demo-copy-btn" type="button" data-copy-text="huynhthang" aria-label="Copy password" title="Copy password"></button></span></td>
+              <td>Ban giám đốc</td>
+            </tr>
+            <tr>
+              <td><span class="demo-copy-cell"><code>clinical_doc01</code><button class="demo-copy-btn" type="button" data-copy-text="clinical_doc01" aria-label="Copy username clinical_doc01" title="Copy username"></button></span></td>
+              <td><span class="demo-copy-cell"><code>huynhthang</code><button class="demo-copy-btn" type="button" data-copy-text="huynhthang" aria-label="Copy password" title="Copy password"></button></span></td>
+              <td>Bác sĩ trưởng khoa</td>
+            </tr>
+            <tr>
+              <td><span class="demo-copy-cell"><code>duoc_01</code><button class="demo-copy-btn" type="button" data-copy-text="duoc_01" aria-label="Copy username duoc_01" title="Copy username"></button></span></td>
+              <td><span class="demo-copy-cell"><code>huynhthang</code><button class="demo-copy-btn" type="button" data-copy-text="huynhthang" aria-label="Copy password" title="Copy password"></button></span></td>
+              <td>Nhân viên quản lý kho dược</td>
+            </tr>
+            <tr>
+              <td><span class="demo-copy-cell"><code>hr_01</code><button class="demo-copy-btn" type="button" data-copy-text="hr_01" aria-label="Copy username hr_01" title="Copy username"></button></span></td>
+              <td><span class="demo-copy-cell"><code>huynhthang</code><button class="demo-copy-btn" type="button" data-copy-text="huynhthang" aria-label="Copy password" title="Copy password"></button></span></td>
+              <td>HR - Nhân sự</td>
+            </tr>
+            <tr>
+              <td><span class="demo-copy-cell"><code>ke_toan_01</code><button class="demo-copy-btn" type="button" data-copy-text="ke_toan_01" aria-label="Copy username ke_toan_01" title="Copy username"></button></span></td>
+              <td><span class="demo-copy-cell"><code>huynhthang</code><button class="demo-copy-btn" type="button" data-copy-text="huynhthang" aria-label="Copy password" title="Copy password"></button></span></td>
+              <td>Kế toán - Tài chính</td>
+            </tr>
+            <tr>
+              <td><span class="demo-copy-cell"><code>ksk_admin</code><button class="demo-copy-btn" type="button" data-copy-text="ksk_admin" aria-label="Copy username ksk_admin" title="Copy username"></button></span></td>
+              <td><span class="demo-copy-cell"><code>huynhthang</code><button class="demo-copy-btn" type="button" data-copy-text="huynhthang" aria-label="Copy password" title="Copy password"></button></span></td>
+              <td>Phụ trách khám sức khỏe đoàn / vận hành</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+
+    {% block tail_js %}
+      {% if entry %}
+        {{ js_bundle(assets_prefix, entry) }}
+      {% endif %}
+      {% include "tail_js_custom_extra.html" %}
+    {% endblock %}
+
+    <script nonce="{{ macros.get_nonce() }}">
+      document.addEventListener('DOMContentLoaded', function () {
+        var preloadLinks = document.querySelectorAll('link[rel="preload"][as="style"]');
+        preloadLinks.forEach(function (link) {
+          link.rel = 'stylesheet';
+        });
+
+        function copyText(value) {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(value);
+          }
+
+          var input = document.createElement('textarea');
+          input.value = value;
+          input.setAttribute('readonly', '');
+          input.style.position = 'fixed';
+          input.style.opacity = '0';
+          document.body.appendChild(input);
+          input.select();
+          document.execCommand('copy');
+          document.body.removeChild(input);
+          return Promise.resolve();
+        }
+
+        var copyButtons = document.querySelectorAll('.demo-copy-btn');
+        copyButtons.forEach(function (button) {
+          button.addEventListener('click', function () {
+            var value = button.getAttribute('data-copy-text');
+            if (!value) {
+              return;
+            }
+
+            copyText(value).then(function () {
+              button.classList.add('is-copied');
+              window.setTimeout(function () {
+                button.classList.remove('is-copied');
+              }, 900);
+            });
+          });
+        });
+      });
+    </script>
+  </body>
+</html>
