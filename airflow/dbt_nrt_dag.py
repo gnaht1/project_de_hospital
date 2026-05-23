@@ -36,6 +36,7 @@ with DAG(
 
     run_dbt_nrt_models = BashOperator(
         task_id='run_dbt_nrt_models',
+        pool='dbt_pool',
         bash_command=(
             f'cd {DBT_PROJECT_DIR} && '
             f'{DBT_BIN} run --profiles-dir {DBT_PROFILES_DIR} -s '

@@ -93,7 +93,7 @@ with DAG(
     'hospital_lakehouse_dbt_pipeline',
     default_args=default_args,
     description='Tu dong hoa dbt chuyen doi Raw Data sang Dim/Fact cho benh vien',
-    schedule='*/30 * * * *',  # Lap lich chay moi 30 phut mot lan
+    schedule='7,37 * * * *',  # Chay phut 07 va 37 de lech voi NRT/maintenance
     start_date=datetime(2026, 5, 7),  # Ngay bat dau
     catchup=False,  # Khong chay bu cac ngay trong qua khu
     max_active_runs=1,  # Dam bao chi co 1 DAG run hoat dong tai moi thoi diem
@@ -104,6 +104,7 @@ with DAG(
     # Dung duong dan tuyet doi cua dbt trong venv de tranh loi moi truong cua Airflow
     run_dbt_marts = BashOperator(
         task_id='run_dbt_models',
+        pool='dbt_pool',
         bash_command=(
             f'cd {DBT_PROJECT_DIR} && '
             f'{DBT_BIN} run --profiles-dir {DBT_PROFILES_DIR} '

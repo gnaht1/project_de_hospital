@@ -1,8 +1,9 @@
 #!/bin/bash
 
 # ==============================
-# Iceberg Lakehouse Maintenance
-# Safe hourly version for small VPS
+# Iceberg Lakehouse Maintenance - Full
+# Run daily at 02:00.
+# Rewrites manifests, compacts hot tables, and removes orphan files.
 # ==============================
 
 set -o pipefail
@@ -12,24 +13,16 @@ SPARK_SQL="/opt/spark/bin/spark-sql"
 
 LOG_PREFIX="--- [$(date '+%Y-%m-%d %H:%M:%S')]"
 
-echo "$LOG_PREFIX BẮT ĐẦU BẢO TRÌ LAKEHOUSE ---"
+echo "$LOG_PREFIX BAT DAU FULL MAINTENANCE ---"
 
-# Snapshot có thể dọn ngắn để giảm metadata nhanh
-SNAPSHOT_EXPIRE_DATE=$(date -d "2 hours ago" +"%Y-%m-%d %H:%M:%S")
-
-# Orphan files bắt buộc nên >= 24h, Iceberg sẽ chặn nếu thấp hơn
+# Orphan files must be older than 24h; Iceberg rejects lower values.
 ORPHAN_EXPIRE_DATE=$(date -d "25 hours ago" +"%Y-%m-%d %H:%M:%S")
 
-echo "=> Sẽ xóa snapshots cũ hơn: $SNAPSHOT_EXPIRE_DATE"
-echo "=> Sẽ xóa orphan files cũ hơn: $ORPHAN_EXPIRE_DATE"
+echo "=> Se xoa orphan files cu hon: $ORPHAN_EXPIRE_DATE"
+echo "=> Target compaction HOT tables: 134217728 bytes/file"
 
-# File SQL tạm
-TEMP_SQL_FILE="/tmp/run_iceberg_maintenance.sql"
+TEMP_SQL_FILE="/tmp/run_iceberg_maintenance_full.sql"
 > "$TEMP_SQL_FILE"
-
-# ==============================
-# 1. Các bảng RAW / Bronze
-# ==============================
 
 RAW_TABLES=(
   "db.dm_khoa_iceberg"
@@ -65,10 +58,6 @@ RAW_TABLES=(
   "db.hospital_configs_iceberg"
 )
 
-# ==============================
-# 2. Các bảng dbt / NRT dễ phình metadata
-# ==============================
-
 HOT_TABLES=(
   "gold_db.mart_core__dm_benh_nhan_snapshot"
   "gold_db.mart_finance__nrt_revenue_receipts"
@@ -77,24 +66,19 @@ HOT_TABLES=(
   "silver_db.int_clinical__specialty_visits"
 )
 
-# ==============================
-# 3. Sinh SQL maintenance
-# ==============================
-
-echo "-- Auto generated Iceberg maintenance SQL" >> "$TEMP_SQL_FILE"
+echo "-- Auto generated Iceberg full maintenance SQL" >> "$TEMP_SQL_FILE"
 echo "-- Generated at $(date)" >> "$TEMP_SQL_FILE"
 echo "" >> "$TEMP_SQL_FILE"
 
 for table in "${RAW_TABLES[@]}"; do
-    echo "-- Maintenance for ${table}" >> "$TEMP_SQL_FILE"
-    echo "CALL his_catalog.system.expire_snapshots(table => '${table}', older_than => TIMESTAMP '${SNAPSHOT_EXPIRE_DATE}', retain_last => 1);" >> "$TEMP_SQL_FILE"
+    echo "-- Rewrite manifests for RAW table ${table}" >> "$TEMP_SQL_FILE"
     echo "CALL his_catalog.system.rewrite_manifests('${table}');" >> "$TEMP_SQL_FILE"
     echo "" >> "$TEMP_SQL_FILE"
 done
 
 for table in "${HOT_TABLES[@]}"; do
-    echo "-- Aggressive maintenance for hot table ${table}" >> "$TEMP_SQL_FILE"
-    echo "CALL his_catalog.system.expire_snapshots(table => '${table}', older_than => TIMESTAMP '${SNAPSHOT_EXPIRE_DATE}', retain_last => 1);" >> "$TEMP_SQL_FILE"
+    echo "-- Full maintenance for hot table ${table}" >> "$TEMP_SQL_FILE"
+    echo "CALL his_catalog.system.rewrite_data_files(table => '${table}', options => map('target-file-size-bytes', '134217728'));" >> "$TEMP_SQL_FILE"
     echo "CALL his_catalog.system.rewrite_manifests('${table}');" >> "$TEMP_SQL_FILE"
     echo "CALL his_catalog.system.remove_orphan_files(table => '${table}', older_than => TIMESTAMP '${ORPHAN_EXPIRE_DATE}');" >> "$TEMP_SQL_FILE"
     echo "" >> "$TEMP_SQL_FILE"
@@ -103,7 +87,7 @@ done
 echo "=> File SQL maintenance:"
 cat "$TEMP_SQL_FILE"
 
-echo "=> Đang chạy Spark SQL maintenance..."
+echo "=> Dang chay Spark SQL full maintenance..."
 
 $SPARK_SQL \
   --packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.4.3,org.postgresql:postgresql:42.6.0 \
@@ -121,7 +105,7 @@ $SPARK_SQL \
   --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
   --conf spark.driver.memory=2g \
   --conf spark.executor.memory=2g \
-  --conf spark.hadoop.javax.jdo.option.ConnectionURL="jdbc:derby:;databaseName=/tmp/maintenance_derby;create=true" \
+  --conf spark.hadoop.javax.jdo.option.ConnectionURL="jdbc:derby:;databaseName=/tmp/maintenance_full_derby;create=true" \
   -f "$TEMP_SQL_FILE"
 
 STATUS=$?
@@ -129,9 +113,9 @@ STATUS=$?
 rm -f "$TEMP_SQL_FILE"
 
 if [ $STATUS -eq 0 ]; then
-    echo "$LOG_PREFIX BẢO TRÌ HOÀN TẤT THÀNH CÔNG ---"
+    echo "$LOG_PREFIX FULL MAINTENANCE HOAN TAT THANH CONG ---"
 else
-    echo "$LOG_PREFIX BẢO TRÌ THẤT BẠI, EXIT CODE = $STATUS ---"
+    echo "$LOG_PREFIX FULL MAINTENANCE THAT BAI, EXIT CODE = $STATUS ---"
 fi
 
 exit $STATUS
