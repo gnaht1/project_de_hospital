@@ -45,6 +45,7 @@ rate_calculation as (
         stat_year,
         stat_month,
         stat_date,
+        date_format(cast(stat_date as date), 'yyyy-MM') as month_key,
         'T' || lpad(cast(stat_month as string), 2, '0') as month_label,
         total_cls_orders,
         completed_cls_orders,
@@ -57,3 +58,4 @@ rate_calculation as (
 )
 
 select * from rate_calculation
+order by sort_order, stat_year, stat_month
