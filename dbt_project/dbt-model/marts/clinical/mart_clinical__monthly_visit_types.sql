@@ -4,9 +4,9 @@ with classified_visits as (
 
 labeled_visits as (
     select
-        extract(year from admission_time) as stat_year,
-        extract(month from admission_time) as stat_month,
-        date_trunc('month', cast(admission_time as timestamp)) as stat_date,
+        extract(year from created_at) as stat_year,
+        extract(month from created_at) as stat_month,
+        date_trunc('month', cast(created_at as timestamp)) as stat_date,
         
         case 
             when is_new_patient = 1 then 'Khám mới'

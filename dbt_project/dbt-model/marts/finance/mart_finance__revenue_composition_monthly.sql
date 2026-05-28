@@ -33,11 +33,12 @@ monthly_summary as (
         stat_year,
         stat_month,
         stat_date,
+        date_format(cast(stat_date as date), 'yyyy-MM') as month_key,
         'T' || lpad(cast(stat_month as string), 2, '0') as month_label,
         revenue_type,
         sum(total_amount) as type_revenue
     from joined_data
-    group by 1, 2, 3, 4, 5
+    group by 1, 2, 3, 4, 5, 6
 ),
 
 percentage_calc as (
@@ -50,3 +51,4 @@ percentage_calc as (
 )
 
 select * from percentage_calc
+order by stat_year, stat_month, revenue_type

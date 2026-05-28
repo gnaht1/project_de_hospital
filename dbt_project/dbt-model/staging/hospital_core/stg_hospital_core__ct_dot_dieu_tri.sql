@@ -15,6 +15,7 @@ renamed_and_casted as (
         cast(kham_suc_khoe as boolean) as is_health_check,
         -- Date parsing
         cast(thoi_gian_vao_vien as timestamp) as admission_time,
+        cast(created_at as timestamp) as created_at,
         khoa_id,
         nb_thong_tin_id,
         -- Audit fields

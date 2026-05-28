@@ -17,6 +17,7 @@ classified_visits as (
         d.dot_dieu_tri_id,
         d.nb_thong_tin_id,
         d.admission_time,
+        d.created_at,
         cast(d.admission_time as date) as visit_date,
         p.first_visit_date,
         
