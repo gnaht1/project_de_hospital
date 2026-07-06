@@ -6,24 +6,24 @@ labeled_visits as (
     select
         extract(year from created_at) as stat_year,
         extract(month from created_at) as stat_month,
-        date_trunc('month', cast(created_at as timestamp)) as stat_date,
-        
-        case 
-            when is_new_patient = 1 then 'Khám mới'
-            when is_return_patient = 1 then 'Tái khám'
-            else 'Khác'
+        extract(day from created_at) as stat_day,
+        cast(date_trunc('day', cast(created_at as timestamp)) as date) as stat_date,
+        case
+            when is_new_patient = 1 then 'Kham moi'
+            when is_return_patient = 1 then 'Tai kham'
+            else 'Khac'
         end as visit_type,
-        
         dot_dieu_tri_id
     from classified_visits
+    where created_at is not null
 ),
 
-monthly_counts as (
+daily_counts as (
     select
         stat_year,
         stat_month,
+        stat_day,
         stat_date,
-        'T' || lpad(cast(stat_month as string), 2, '0') as month_label,
         visit_type,
         count(dot_dieu_tri_id) as type_visits
     from labeled_visits
@@ -34,13 +34,14 @@ percentage_calc as (
     select
         stat_year,
         stat_month,
+        stat_day,
         stat_date,
-        month_label,
         visit_type,
         type_visits,
-        sum(type_visits) over (partition by stat_year, stat_month) as total_month_visits,
-        cast(type_visits as double) / sum(type_visits) over (partition by stat_year, stat_month) as visit_percentage
-    from monthly_counts
+        sum(type_visits) over (partition by stat_date) as total_day_visits,
+        cast(type_visits as double) / sum(type_visits) over (partition by stat_date) as visit_percentage
+    from daily_counts
 )
 
-select * from percentage_calc
+select *
+from percentage_calc

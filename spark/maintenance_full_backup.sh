@@ -3,7 +3,7 @@
 # ==============================
 # Iceberg Lakehouse Maintenance - Full
 # Run daily at 02:00.
-# Expires snapshots, compacts hot tables, rewrites manifests, and removes orphan files.
+# Rewrites manifests, compacts hot tables, and removes orphan files.
 # ==============================
 
 set -o pipefail
@@ -15,13 +15,10 @@ LOG_PREFIX="--- [$(date '+%Y-%m-%d %H:%M:%S')]"
 
 echo "$LOG_PREFIX BAT DAU FULL MAINTENANCE ---"
 
-# Orphan files must be older than 24h; keep a 25h buffer because Iceberg rejects lower values.
+# Orphan files must be older than 24h; Iceberg rejects lower values.
 ORPHAN_EXPIRE_DATE=$(date -d "25 hours ago" +"%Y-%m-%d %H:%M:%S")
-# Snapshot retention for hot table maintenance.
-SNAPSHOT_EXPIRE_DATE=$(date -d "24 hours ago" +"%Y-%m-%d %H:%M:%S")
 
 echo "=> Se xoa orphan files cu hon: $ORPHAN_EXPIRE_DATE"
-echo "=> Se expire snapshots cu hon: $SNAPSHOT_EXPIRE_DATE"
 echo "=> Target compaction HOT tables: 134217728 bytes/file"
 
 TEMP_SQL_FILE="/tmp/run_iceberg_maintenance_full.sql"
@@ -89,10 +86,9 @@ done
 
 for table in "${HOT_TABLES[@]}"; do
     echo "-- Full maintenance for hot table ${table}" >> "$TEMP_SQL_FILE"
-    echo "CALL his_catalog.system.expire_snapshots(table => '${table}', older_than => TIMESTAMP '${SNAPSHOT_EXPIRE_DATE}');" >> "$TEMP_SQL_FILE"
     echo "CALL his_catalog.system.rewrite_data_files(table => '${table}', options => map('target-file-size-bytes', '134217728'));" >> "$TEMP_SQL_FILE"
     echo "CALL his_catalog.system.rewrite_manifests('${table}');" >> "$TEMP_SQL_FILE"
-    # echo "CALL his_catalog.system.remove_orphan_files(table => '${table}', older_than => TIMESTAMP '${ORPHAN_EXPIRE_DATE}');" >> "$TEMP_SQL_FILE"
+    echo "CALL his_catalog.system.remove_orphan_files(table => '${table}', older_than => TIMESTAMP '${ORPHAN_EXPIRE_DATE}');" >> "$TEMP_SQL_FILE"
     echo "" >> "$TEMP_SQL_FILE"
 done
 

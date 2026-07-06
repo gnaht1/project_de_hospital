@@ -15,7 +15,7 @@ LOG_PREFIX="--- [$(date '+%Y-%m-%d %H:%M:%S')]"
 
 echo "$LOG_PREFIX BAT DAU LIGHT MAINTENANCE ---"
 
-SNAPSHOT_EXPIRE_DATE=$(date -d "2 hours ago" +"%Y-%m-%d %H:%M:%S")
+SNAPSHOT_EXPIRE_DATE=$(date -d "24 hours ago" +"%Y-%m-%d %H:%M:%S")
 
 echo "=> Se xoa snapshots HOT tables cu hon: $SNAPSHOT_EXPIRE_DATE"
 
@@ -28,6 +28,11 @@ HOT_TABLES=(
   "gold_db.mart_finance__nrt_revenue_today_vs_yesterday"
   "gold_db.mart_clinical__nrt_specialty_density_hourly"
   "silver_db.int_clinical__specialty_visits"
+  "silver_db.int_clinical__patient_visits_classified"
+  "silver_db.int_finance__receipt_transactions"
+  "silver_db.int_finance__valid_payments"
+  "silver_db.int_clinical__enriched_episodes"
+  "silver_db.int_clinical__exam_visit_status"
 )
 
 echo "-- Auto generated Iceberg light maintenance SQL" >> "$TEMP_SQL_FILE"

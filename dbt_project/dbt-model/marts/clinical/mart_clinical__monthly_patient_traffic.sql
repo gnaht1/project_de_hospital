@@ -5,11 +5,11 @@ with patient_visits as (
 
 monthly_traffic as (
     select
-        extract(year from admission_time) as stat_year,
-        extract(month from admission_time) as stat_month,
+        extract(year from created_at) as stat_year,
+        extract(month from created_at) as stat_month,
         
         -- Mốc thời gian để Superset so sánh (Time Range)
-        date_trunc('month', cast(admission_time as timestamp)) as stat_date,
+        date_trunc('month', cast(created_at as timestamp)) as stat_date,
         
         -- 1. Tổng số LƯỢT khám (Mỗi lần đăng ký là 1 lượt)
         count(dot_dieu_tri_id) as total_visits,
@@ -18,6 +18,7 @@ monthly_traffic as (
         count(distinct nb_thong_tin_id) as unique_patients
         
     from patient_visits
+    where created_at is not null
     group by 1, 2, 3
 )
 

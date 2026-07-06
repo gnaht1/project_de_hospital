@@ -15,10 +15,10 @@ employee_stats as (
         hop_dong_id,
         count(distinct ma_nhan_vien) as total_employees_registered,
         count(distinct case
-            when thoi_gian_hoan_thanh is not null then ma_nhan_vien
+            when coalesce(thoi_gian_hoan_thanh, thoi_gian_ket_thuc_kham) is not null then ma_nhan_vien
         end) as total_employees_examined,
         count(kham_suc_khoe_id) as total_health_check_records,
-        max(thoi_gian_hoan_thanh) as latest_completion_time
+        max(coalesce(thoi_gian_hoan_thanh, thoi_gian_ket_thuc_kham)) as latest_completion_time
     from health_checks
     where hop_dong_id is not null
     group by 1
@@ -41,6 +41,8 @@ select
     c.so_hop_dong,
     c.ngay_hieu_luc,
     c.thoi_gian_thanh_ly,
+    c.created_at,
+    c.updated_at,
     c.trang_thai_hop_dong,
     c.tien_chua_thanh_toan,
     c.tien_da_thanh_toan,

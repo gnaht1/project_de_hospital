@@ -2,62 +2,88 @@ with contract_performance as (
     select * from {{ ref('int_ksk__contract_performance') }}
 ),
 
-health_checks as (
-    select * from {{ ref('stg_hospital_core__ct_kham_suc_khoe') }}
-),
-
 active_contracts as (
     select
         hop_dong_id,
+        code_hop_dong,
+        ten_hop_dong,
+        so_hop_dong,
         ngay_hieu_luc,
-        coalesce(tien_thuc_te_sau_giam, tien_thuc_te, 0) as contract_revenue_amount,
-        coalesce(tien_chua_thanh_toan, 0) as outstanding_amount
+        thoi_gian_thanh_ly,
+        created_at,
+        updated_at,
+        coalesce(
+            ngay_hieu_luc,
+            created_at,
+            latest_completion_time,
+            thoi_gian_thanh_ly
+        ) as contract_stat_time,
+        latest_completion_time,
+        trang_thai_hop_dong,
+        package_count,
+        package_name_list,
+        total_employees_registered,
+        total_employees_examined,
+        total_health_check_records,
+        case
+            when tien_thuc_te_sau_giam > 0 then tien_thuc_te_sau_giam
+            when tien_thuc_te > 0 then tien_thuc_te
+            when tien_du_kien_sau_giam > 0 then tien_du_kien_sau_giam
+            else tien_du_kien
+        end as contract_revenue_amount,
+        coalesce(tien_chua_thanh_toan, 0) as outstanding_amount,
+        coalesce(tien_da_thanh_toan, 0) as paid_amount,
+        coalesce(tien_du_kien, 0) as expected_revenue_amount,
+        coalesce(tien_du_kien_sau_giam, 0) as expected_revenue_after_discount_amount,
+        coalesce(tien_thuc_te, 0) as actual_revenue_amount,
+        coalesce(tien_thuc_te_sau_giam, 0) as actual_revenue_after_discount_amount
     from contract_performance
     where trang_thai_hop_dong = 40
 ),
 
-kpi_active_contracts as (
+contract_revenue as (
     select
-        count(distinct hop_dong_id) as active_contracts
-    from active_contracts
-),
+        cast(contract_stat_time as timestamp) as stat_time,
+        cast(date_trunc('day', contract_stat_time) as date) as stat_date,
+        extract(year from contract_stat_time) as stat_year,
+        extract(month from contract_stat_time) as stat_month,
+        cast(date_trunc('week', contract_stat_time) as date) as stat_week,
+        cast(date_trunc('month', contract_stat_time) as date) as stat_month_start,
+        cast(date_trunc('quarter', contract_stat_time) as date) as stat_quarter_start,
+        cast(date_trunc('year', contract_stat_time) as date) as stat_year_start,
+        date_format(cast(date_trunc('month', contract_stat_time) as date), 'yyyy-MM') as stat_month_label,
 
-kpi_examined_today as (
-    select
-        count(distinct case
-            when h.ma_nhan_vien is not null then concat(cast(h.hop_dong_id as string), '||', h.ma_nhan_vien)
-        end) as total_examined_employees
-    from health_checks h
-    inner join active_contracts ac
-        on h.hop_dong_id = ac.hop_dong_id
-    where cast(h.thoi_gian_hoan_thanh as date) = current_date
-),
+        hop_dong_id,
+        cast(code_hop_dong as string) as contract_code,
+        ten_hop_dong as contract_name,
+        so_hop_dong as contract_number,
+        case
+            when package_count = 0 then 'Chưa cấu hình gói'
+            when package_count = 1 then package_name_list
+            else concat(cast(package_count as string), ' gói')
+        end as package_summary,
+        package_count,
+        package_name_list,
+        total_employees_registered,
+        total_employees_examined,
+        total_health_check_records,
+        'Đang TH' as contract_status_label,
+        trang_thai_hop_dong,
+        ngay_hieu_luc,
+        thoi_gian_thanh_ly,
+        created_at,
+        updated_at,
+        latest_completion_time,
 
-kpi_revenue_this_month as (
-    select
-        sum(case
-            when cast(date_trunc('month', ngay_hieu_luc) as date) = cast(date_trunc('month', current_date) as date)
-            then contract_revenue_amount
-            else 0
-        end) as contract_revenue_amount
-    from active_contracts
-),
-
-kpi_outstanding_current as (
-    select
-        sum(outstanding_amount) as outstanding_amount
+        contract_revenue_amount,
+        outstanding_amount,
+        paid_amount,
+        expected_revenue_amount,
+        expected_revenue_after_discount_amount,
+        actual_revenue_amount,
+        actual_revenue_after_discount_amount
     from active_contracts
 )
 
-select
-    current_date as snapshot_date,
-    cast(date_trunc('month', current_date) as date) as month_start,
-    date_format(cast(date_trunc('month', current_date) as date), 'yyyy-MM') as stat_month,
-    coalesce(a.active_contracts, 0) as active_contracts,
-    coalesce(e.total_examined_employees, 0) as total_examined_employees,
-    coalesce(r.contract_revenue_amount, 0) as contract_revenue_amount,
-    coalesce(o.outstanding_amount, 0) as outstanding_amount
-from kpi_active_contracts a
-cross join kpi_examined_today e
-cross join kpi_revenue_this_month r
-cross join kpi_outstanding_current o
+select *
+from contract_revenue

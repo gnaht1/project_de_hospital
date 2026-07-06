@@ -170,6 +170,30 @@
     font-weight: 700;
   }
 
+  .demo-login-note {
+    margin: 0 0 14px;
+    padding: 12px 14px;
+    border: 1px solid rgba(103, 232, 249, 0.28);
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.14), rgba(34, 197, 94, 0.08));
+  }
+
+  .demo-login-note-title {
+    margin: 0 0 6px;
+    color: #67e8f9;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .demo-login-note-text {
+    margin: 0;
+    color: #dbeafe;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
   .demo-login-table {
     width: 100%;
     table-layout: fixed;
@@ -316,6 +340,10 @@
 
       <div class="demo-login-panel">
         <h3 class="demo-login-title">Demo accounts table</h3>
+        <section class="demo-login-note" aria-labelledby="demo-login-note-title">
+          <h4 class="demo-login-note-title" id="demo-login-note-title">Live data</h4>
+          <p class="demo-login-note-text">Dữ liệu được update mỗi ngày theo thời điểm hiện tại</p>
+        </section>
         <table class="demo-login-table">
           <thead>
             <tr>
@@ -336,11 +364,17 @@
               <td>Ban giám đốc</td>
             </tr>
             <tr>
-              <td><span class="demo-copy-cell"><code>clinical_doc01</code><button class="demo-copy-btn" type="button" data-copy-text="clinical_doc01" aria-label="Copy username clinical_doc01" title="Copy username"></button></span></td>
+              <td><span class="demo-copy-cell"><code>truong_phong_kinh_doanh</code><button class="demo-copy-btn" type="button" data-copy-text="truong_phong_kinh_doanh" aria-label="Copy username truong_phong_kinh_doanh" title="Copy username"></button></span></td>
               <td><span class="demo-copy-cell"><code>huynhthang</code><button class="demo-copy-btn" type="button" data-copy-text="huynhthang" aria-label="Copy password" title="Copy password"></button></span></td>
-              <td>Bác sĩ trưởng khoa</td>
+              <td>Trưởng phòng Kinh doanh & Marketing</td>
             </tr>
             <tr>
+              <td><span class="demo-copy-cell"><code>truong_khoi_lam_sang</code><button class="demo-copy-btn" type="button" data-copy-text="truong_khoi_lam_sang" aria-label="Copy username truong_khoi_lam_sang" title="Copy username"></button></span></td>
+              <td><span class="demo-copy-cell"><code>huynhthang</code><button class="demo-copy-btn" type="button" data-copy-text="huynhthang" aria-label="Copy password" title="Copy password"></button></span></td>
+              <td>Trưởng khối Vận hành Lâm sàng</td>
+            </tr>
+
+            <!-- <tr>
               <td><span class="demo-copy-cell"><code>duoc_01</code><button class="demo-copy-btn" type="button" data-copy-text="duoc_01" aria-label="Copy username duoc_01" title="Copy username"></button></span></td>
               <td><span class="demo-copy-cell"><code>huynhthang</code><button class="demo-copy-btn" type="button" data-copy-text="huynhthang" aria-label="Copy password" title="Copy password"></button></span></td>
               <td>Nhân viên quản lý kho dược</td>
@@ -359,7 +393,7 @@
               <td><span class="demo-copy-cell"><code>ksk_admin</code><button class="demo-copy-btn" type="button" data-copy-text="ksk_admin" aria-label="Copy username ksk_admin" title="Copy username"></button></span></td>
               <td><span class="demo-copy-cell"><code>huynhthang</code><button class="demo-copy-btn" type="button" data-copy-text="huynhthang" aria-label="Copy password" title="Copy password"></button></span></td>
               <td>Phụ trách khám sức khỏe đoàn / vận hành</td>
-            </tr>
+            </tr> -->
           </tbody>
         </table>
       </div>

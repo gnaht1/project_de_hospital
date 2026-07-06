@@ -13,7 +13,12 @@ select
     end as package_summary,
     total_employees_registered,
     total_employees_examined,
-    coalesce(tien_thuc_te_sau_giam, tien_thuc_te, 0) as contract_revenue_amount,
+    case
+        when tien_thuc_te_sau_giam > 0 then tien_thuc_te_sau_giam
+        when tien_thuc_te > 0 then tien_thuc_te
+        when tien_du_kien_sau_giam > 0 then tien_du_kien_sau_giam
+        else tien_du_kien
+    end as contract_revenue_amount,
     case
         when trang_thai_hop_dong = 40 then 'Đang TH'
         else cast(trang_thai_hop_dong as string)

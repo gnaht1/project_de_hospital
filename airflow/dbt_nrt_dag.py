@@ -27,7 +27,7 @@ with DAG(
     'hospital_lakehouse_dbt_nrt_pipeline',
     default_args=default_args,
     description='Chay dbt NRT moi 3 phut cho cac chart realtime',
-    schedule='*/3 * * * *',
+    schedule='*/20 * * * *',
     max_active_runs=1,
     start_date=datetime(2026, 5, 7),
     catchup=False,
