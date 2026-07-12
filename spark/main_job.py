@@ -87,8 +87,8 @@ def start_stream_for_topic(spark, topic, conf):
         .format("kafka") \
         .option("kafka.bootstrap.servers", KAFKA_SERVER) \
         .option("subscribe", topic) \
-        .option("startingOffsets", "latest") \
-        .option("maxOffsetsPerTrigger", 1000) \
+        .option("startingOffsets", "earliest") \
+        .option("maxOffsetsPerTrigger", 15000) \
         .load()
 
     # Parse JSON & Flatten (Included 'op' for delete handling)
@@ -149,7 +149,7 @@ def start_stream_for_topic(spark, topic, conf):
     # Start streaming with 5-minute trigger to reduce commit frequency and help metadata compaction
     query = df_parsed.writeStream \
         .foreachBatch(upsert_to_iceberg) \
-        .trigger(processingTime="10 minutes") \
+        .trigger(processingTime="3 minutes") \
         .option("checkpointLocation", f"s3a://{BUCKET_NAME}/checkpoints/{table_name}") \
         .start()
     
