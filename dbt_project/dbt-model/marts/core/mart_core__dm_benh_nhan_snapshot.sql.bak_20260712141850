@@ -22,13 +22,8 @@ with bronze_src as (
     from {{ source('raw_hospital', 'dm_benh_nhan_iceberg') }}
 
     {% if is_incremental() %}
-      -- Overlap window: re-scan the last 5 seconds of already-loaded data in
-      -- addition to strictly-new rows. This guards against rows that share
-      -- (or nearly share) a ts_ms value with the current high-water mark and
-      -- would otherwise be permanently skipped once the watermark advances
-      -- past them (merge on nb_thong_tin_id makes re-processing them a no-op).
       where cast(ts_ms as bigint) > (
-          select coalesce(max(cast(ts_ms as bigint)), 0) - 5000
+          select coalesce(max(cast(ts_ms as bigint)), 0)
           from {{ this }}
       )
     {% endif %}
