@@ -231,3 +231,4 @@ dbt_project/.user.yml
 # DB Diagram
 docs/dbdiagram/core_hospital.dbdiagram
 .vscode
+backup_dashboard
